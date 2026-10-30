@@ -83,21 +83,21 @@ class _BillingHomePageState extends State<BillingHomePage> {
       appBar: AppBar(
         title: Text('Billing Mini ISP (${filteredPelanggan.length} Pelanggan)'),
         actions: [
-          PopupMenuButton<String>(
+          PopupMenuButton(
             icon: const Icon(Icons.sort),
             onSelected: (value) {
               setState(() {
-                sortBy = value;
+                sortBy = value.toString();
                 _applyFilterAndSort();
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem<String>(value: 'default', child: Text('Urutan Default')),
-              const PopupMenuItem<String>(value: 'nama', child: Text('Urutkan Nama')),
-              const PopupMenuItem<String>(value: 'alamat', child: Text('Urutkan Alamat')),
-              const PopupMenuItem<String>(value: 'paket', child: Text('Urutkan Paket')),
-              const PopupMenuItem<String>(value: 'lunas', child: Text('Filter: Sudah Lunas')),
-              const PopupMenuItem<String>(value: 'belum_lunas', child: Text('Filter: Belum Lunas')),
+              const PopupMenuItem(value: 'default', child: Text('Urutan Default')),
+              const PopupMenuItem(value: 'nama', child: Text('Urutkan Nama')),
+              const PopupMenuItem(value: 'alamat', child: Text('Urutkan Alamat')),
+              const PopupMenuItem(value: 'paket', child: Text('Urutkan Paket')),
+              const PopupMenuItem(value: 'lunas', child: Text('Filter: Sudah Lunas')),
+              const PopupMenuItem(value: 'belum_lunas', child: Text('Filter: Belum Lunas')),
             ],
           ),
           IconButton(
@@ -298,15 +298,15 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       decoration: const InputDecoration(labelText: 'Metode Pembayaran'),
                       value: selectedMetode,
                       items: ['Tunai', 'QRIS', 'Transfer Bank'].map((metode) {
-                        return DropdownMenuItem<String>(value: metode, child: Text(metode));
+                        return DropdownMenuItem(value: metode, child: Text(metode));
                       }).toList(),
                       onChanged: (val) {
                         setDialogState(() {
-                          selectedMetode = val!;
+                          selectedMetode = val.toString();
                         });
                       },
                     ),
@@ -626,32 +626,32 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
                 value: selectedPaket,
                 items: daftarPaket.map((paket) {
-                  return DropdownMenuItem>(
+                  return DropdownMenuItem(
                     value: paket,
                     child: Text('${paket['nama']} (${paket['harga']})'),
                   );
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedPaket = val;
+                    selectedPaket = val as Map<String, dynamic>?;
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
                 value: selectedJatuhTempo,
                 items: daftarJatuhTempo.map((tgl) {
-                  return DropdownMenuItem<String>(value: tgl, child: Text(tgl));
+                  return DropdownMenuItem(value: tgl, child: Text(tgl));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedJatuhTempo = val!;
+                    selectedJatuhTempo = val.toString();
                   });
                 },
               ),
@@ -786,44 +786,44 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
                 items: daftarPaket.map((paket) {
-                  return DropdownMenuItem>(
+                  return DropdownMenuItem(
                     value: paket,
                     child: Text('${paket['nama']} (${paket['harga']})'),
                   );
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedPaket = val;
+                    selectedPaket = val as Map<String, dynamic>?;
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
                 value: selectedJatuhTempo,
                 items: daftarJatuhTempo.map((tgl) {
-                  return DropdownMenuItem<String>(value: tgl, child: Text(tgl));
+                  return DropdownMenuItem(value: tgl, child: Text(tgl));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedJatuhTempo = val!;
+                    selectedJatuhTempo = val.toString();
                   });
                 },
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Status Pembayaran Awal'),
                 value: selectedStatus,
                 items: daftarStatus.map((st) {
-                  return DropdownMenuItem<String>(value: st, child: Text(st));
+                  return DropdownMenuItem(value: st, child: Text(st));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedStatus = val!;
+                    selectedStatus = val.toString();
                   });
                 },
               ),
