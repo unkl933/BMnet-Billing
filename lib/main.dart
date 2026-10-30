@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:share_plus/share_plus.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
@@ -147,7 +150,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                   (item['nama'] ?? '').toString(), 
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '0'} Bulan (${item['status'] ?? '-'})'),
+                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan (Rp ${item['total_tunggakan'] ?? '0'} incl. PPN 11%)'),
                                 isThreeLine: true,
                                 trailing: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -246,17 +249,119 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     }
   }
 
+  // Kirim Nota / Struk menggunakan share_plus (Termasuk PPN 11%)
+  void shareStrukWhatsApp() {
+    final nama = widget.pelangganData['nama'] ?? '';
+    final idpel = widget.pelangganData['idpel'] ?? '';
+    final paket = widget.pelangganData['paket'] ?? '';
+    final bulan = widget.pelangganData['jumlah_bulan_tunggakan'] ?? '1';
+    final total = widget.pelangganData['total_tunggakan'] ?? '0';
+    final status = widget.pelangganData['status'] ?? 'Belum Lunas';
+    final metode = widget.pelangganData['metode_pembayaran'] ?? '-';
+    final kasir = widget.pelangganData['diterima_oleh'] ?? '-';
+
+    String pesan = "*STRUK / BUKTI PEMBAYARAN BMNET*\n"
+        "=====================================\n"
+        "ID Pelanggan : $idpel\n"
+        "Nama         : $nama\n"
+        "Paket        : $paket\n"
+        "Bulan Tagih  : $bulan Bulan\n"
+        "Total Bayar  : Rp $total (Incl. PPN 11%)\n"
+        "Metode Bayar : $metode\n"
+        "Diterima Oleh: $kasir\n"
+        "Status       : *$status*\n"
+        "=====================================\n"
+        "Terima kasih telah berlangganan internet bersama BMnet!";
+
+    Share.share(pesan);
+  }
+
+  // Cetak Bukti Pembayaran / Struk Bluetooth Thermal Printer (Termasuk PPN 11%)
+  void cetakStrukBluetooth() async {
+    List<BluetoothInfo> devices = [];
+    try {
+      devices = await PrintBluetoothThermal.pairedBluetooths;
+    } catch (e) {
+      // ignore
+    }
+
+    if (devices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak ada perangkat Bluetooth printer yang terpasang!')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Pilih Printer Bluetooth'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: devices.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(devices[index].name),
+                  subtitle: Text(devices[index].macAdress),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    bool connected = await PrintBluetoothThermal.connect(macPrinterAddress: devices[index].macAdress);
+                    if (connected) {
+                      bool isConnected = await PrintBluetoothThermal.connectionStatus;
+                      if (isConnected) {
+                        String struk = "          BMNET ISP BILLING\n"
+                            "       BUKTI PEMBAYARAN RESMI\n"
+                            "================================\n"
+                            "ID Pel : ${widget.pelangganData['idpel']}\n"
+                            "Nama   : ${widget.pelangganData['nama']}\n"
+                            "Paket  : ${widget.pelangganData['paket']}\n"
+                            "Bulan  : ${widget.pelangganData['jumlah_bulan_tunggakan']} Bulan\n"
+                            "Total  : Rp ${widget.pelangganData['total_tunggakan']}\n"
+                            "       (Termasuk PPN 11%)\n"
+                            "Metode : ${widget.pelangganData['metode_pembayaran']}\n"
+                            "Kasir  : ${widget.pelangganData['diterima_oleh']}\n"
+                            "Status : ${widget.pelangganData['status']}\n"
+                            "================================\n"
+                            "   Terima Kasih Telah Membayar\n"
+                            "     Simpan Struk Ini Sebagai\n"
+                            "       Bukti Sah Pembayaran\n\n\n";
+                        await PrintBluetoothThermal.writeBytes(utf8.encode(struk));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Struk bukti pembayaran berhasil dicetak!')),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Gagal terhubung ke printer thermal!')),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showPaymentDialog() {
     String selectedMetode = 'Tunai';
     final TextEditingController penerimaController = TextEditingController();
-    final TextEditingController bulanController = TextEditingController(text: '1');
+    final TextEditingController bulanController = TextEditingController(text: widget.pelangganData['jumlah_bulan_tunggakan']?.toString() ?? '1');
     final TextEditingController totalTunggakanController = TextEditingController();
     final TextEditingController bayarController = TextEditingController();
 
     int hargaPaket = int.tryParse(widget.pelangganData['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+    int initialBulan = int.tryParse(bulanController.text) ?? 1;
     
-    totalTunggakanController.text = hargaPaket.toString();
-    bayarController.text = hargaPaket.toString();
+    // Hitung dengan PPN 11%
+    int calculatedTotal = (hargaPaket * initialBulan * 1.11).round();
+    totalTunggakanController.text = calculatedTotal.toString();
+    bayarController.text = calculatedTotal.toString();
 
     showDialog(
       context: context,
@@ -264,7 +369,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Kelola Pembayaran & Tunggakan'),
+              title: const Text('Kelola Pembayaran & Tunggakan (+ PPN 11%)'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -275,7 +380,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       decoration: const InputDecoration(labelText: 'Jumlah Bulan Tunggakan'),
                       onChanged: (val) {
                         int bulan = int.tryParse(val) ?? 1;
-                        int total = bulan * hargaPaket;
+                        int total = (bulan * hargaPaket * 1.11).round();
                         setDialogState(() {
                           totalTunggakanController.text = total.toString();
                           bayarController.text = total.toString();
@@ -286,7 +391,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     TextField(
                       controller: totalTunggakanController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Total Nominal Tunggakan (Rp)'),
+                      decoration: const InputDecoration(labelText: 'Total Nominal Tunggakan (Rp incl. PPN 11%)'),
                     ),
                     const SizedBox(height: 10),
                     TextField(
@@ -294,7 +399,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Jumlah yang Dibayar Sekarang (Rp)',
-                        hintText: 'Misal: bayar 200rb dulu',
+                        hintText: 'Misal: bayar lunas / sebagian',
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -420,8 +525,8 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     _buildRow('Nama', widget.pelangganData['nama']?.toString() ?? '-'),
                     _buildRow('Paket Internet', widget.pelangganData['paket']?.toString() ?? '-'),
                     _buildRow('Harga Paket', widget.pelangganData['harga']?.toString() ?? '-'),
-                    _buildRow('Bulan Tunggakan', '${widget.pelangganData['jumlah_bulan_tunggakan'] ?? '0'} Bulan'),
-                    _buildRow('Total Tunggakan', 'Rp ${widget.pelangganData['total_tunggakan'] ?? '0'}'),
+                    _buildRow('Bulan Tunggakan', '${widget.pelangganData['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
+                    _buildRow('Total Tagihan', 'Rp ${widget.pelangganData['total_tunggakan'] ?? '0'} (Incl. PPN 11%)'),
                     _buildRow('Sisa Tunggakan', 'Rp ${widget.pelangganData['sisa_tunggakan'] ?? '0'}'),
                     _buildRow('Metode Bayar', widget.pelangganData['metode_pembayaran']?.toString() ?? '-'),
                     _buildRow('Diterima Oleh', widget.pelangganData['diterima_oleh']?.toString() ?? '-'),
@@ -434,7 +539,29 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                    onPressed: shareStrukWhatsApp,
+                    icon: const Icon(Icons.share),
+                    label: const Text('Kirim Struk WA'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+                    onPressed: cetakStrukBluetooth,
+                    icon: const Icon(Icons.print),
+                    label: const Text('Cetak Struk'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             isUpdating
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton.icon(
@@ -445,6 +572,8 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     ),
                     onPressed: () {
                       if (isLunas) {
+                        int hrg = int.tryParse(widget.pelangganData['harga']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '100000') ?? 100000;
+                        int defaultTotal = (hrg * 1.11).round();
                         updateStatusData({
                           "action": "update_status",
                           "idpel": widget.pelangganData['idpel']?.toString(),
@@ -453,7 +582,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                           "metode_pembayaran": "-",
                           "diterima_oleh": "-",
                           "jumlah_bulan_tunggakan": "1",
-                          "total_tunggakan": "0",
+                          "total_tunggakan": defaultTotal.toString(),
                           "sisa_tunggakan": "0",
                         });
                       } else {
@@ -511,6 +640,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   late TextEditingController _hpController;
   late TextEditingController _nikController;
   late TextEditingController _salesController;
+  late TextEditingController _bulanController;
 
   var daftarPaket = [
     {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
@@ -535,6 +665,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
     _hpController = TextEditingController(text: widget.pelangganData['no_hp']?.toString() ?? '');
     _nikController = TextEditingController(text: widget.pelangganData['nik']?.toString() ?? '');
     _salesController = TextEditingController(text: widget.pelangganData['sales']?.toString() ?? '');
+    _bulanController = TextEditingController(text: widget.pelangganData['jumlah_bulan_tunggakan']?.toString() ?? '1');
 
     selectedJatuhTempo = widget.pelangganData['jatuh_tempo']?.toString() ?? 'Tanggal 5';
     if (!daftarJatuhTempo.contains(selectedJatuhTempo)) {
@@ -559,6 +690,11 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
 
     setState(() => isSaving = true);
 
+    int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+    int bulanInt = int.tryParse(_bulanController.text) ?? 1;
+    // Hitung total dengan PPN 11%
+    int totalTunggakan = (hargaInt * bulanInt * 1.11).round();
+
     final payload = {
       "action": "update_pelanggan",
       "idpel": widget.pelangganData['idpel']?.toString(),
@@ -570,6 +706,9 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
       "nik": _nikController.text,
       "jatuh_tempo": selectedJatuhTempo,
       "sales": _salesController.text,
+      "jumlah_bulan_tunggakan": _bulanController.text,
+      "total_tunggakan": totalTunggakan.toString(),
+      "sisa_tunggakan": totalTunggakan.toString(),
     };
 
     try {
@@ -588,6 +727,8 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
         widget.pelangganData['nik'] = _nikController.text;
         widget.pelangganData['jatuh_tempo'] = selectedJatuhTempo;
         widget.pelangganData['sales'] = _salesController.text;
+        widget.pelangganData['jumlah_bulan_tunggakan'] = _bulanController.text;
+        widget.pelangganData['total_tunggakan'] = totalTunggakan.toString();
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Data pelanggan berhasil diperbarui!')),
@@ -632,7 +773,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
                 items: daftarPaket.map((paket) {
                   return DropdownMenuItem(
                     value: paket,
-                    child: Text('${paket['nama']} (${paket['harga']})'),
+                    child: Text('${paket['nama']} (${paket['harga']} + PPN)'),
                   );
                 }).toList(),
                 onChanged: (val) {
@@ -641,6 +782,13 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _bulanController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan / Tunggakan'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField(
@@ -704,6 +852,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _hpController = TextEditingController();
   final TextEditingController _nikController = TextEditingController();
   final TextEditingController _salesController = TextEditingController();
+  final TextEditingController _bulanController = TextEditingController(text: '1');
 
   var daftarPaket = [
     {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
@@ -732,6 +881,11 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
     setState(() => isSaving = true);
 
+    int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+    int bulanInt = int.tryParse(_bulanController.text) ?? 1;
+    // Hitung total dengan PPN 11%
+    int totalTunggakan = (hargaInt * bulanInt * 1.11).round();
+
     final payload = {
       "nama": _namaController.text,
       "alamat": _alamatController.text,
@@ -742,6 +896,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
       "jatuh_tempo": selectedJatuhTempo,
       "status": selectedStatus,
       "sales": _salesController.text,
+      "jumlah_bulan_tunggakan": _bulanController.text,
+      "total_tunggakan": totalTunggakan.toString(),
+      "sisa_tunggakan": totalTunggakan.toString(),
     };
 
     try {
@@ -791,7 +948,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 items: daftarPaket.map((paket) {
                   return DropdownMenuItem(
                     value: paket,
-                    child: Text('${paket['nama']} (${paket['harga']})'),
+                    child: Text('${paket['nama']} (${paket['harga']} + PPN)'),
                   );
                 }).toList(),
                 onChanged: (val) {
@@ -800,6 +957,13 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _bulanController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan Awal'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField(
