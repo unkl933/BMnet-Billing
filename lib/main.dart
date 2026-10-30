@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-// GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
 void main() {
@@ -111,7 +110,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _nikController = TextEditingController();
   final TextEditingController _salesController = TextEditingController();
 
-  // Daftar paket internet (Sudah diperbaiki tipe datanya menjadi List>)
   final List> daftarPaket = [
     {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
     {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -183,7 +181,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _alamatController,
-                decoration: const InputDecoration(labelText: 'Alamat (Contoh: Buniruum / Kiarajangkung)'),
+                decoration: const InputDecoration(labelText: 'Alamat'),
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
@@ -206,7 +204,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               TextFormField(
                 controller: _hpController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'No WhatsApp (Awali 62 / 08...)'),
+                decoration: const InputDecoration(labelText: 'No WhatsApp'),
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
