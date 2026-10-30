@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 // GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA
-const String scriptUrl = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
 void main() {
   runApp(const MaterialApp(
@@ -111,9 +111,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _nikController = TextEditingController();
   final TextEditingController _salesController = TextEditingController();
 
-  // Daftar paket sesuai permintaan Anda
+  // Daftar paket internet (Sudah diperbaiki tipe datanya menjadi List>)
   final List> daftarPaket = [
-    {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'}, // atau 100rb bersih sesuai kebijakan
+    {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
     {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
     {'nama': 'Paket Building (Free Android TV)', 'harga': 'Rp 121.622'},
     {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
