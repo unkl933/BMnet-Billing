@@ -147,7 +147,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                   (item['nama'] ?? '').toString(), 
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nJatuh Tempo: ${item['jatuh_tempo'] ?? 'Tanggal 5'}'),
+                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '0'} Bulan (${item['status'] ?? '-'})'),
                                 isThreeLine: true,
                                 trailing: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -211,34 +211,32 @@ class DetailPelangganPage extends StatefulWidget {
 class _DetailPelangganPageState extends State<DetailPelangganPage> {
   bool isUpdating = false;
 
-  Future<void> updateStatus(String statusBaru) async {
+  Future<void> updateStatusData(Map<String, dynamic> payloadData) async {
     setState(() => isUpdating = true);
-
-    final payload = {
-      "idpel": widget.pelangganData['idpel']?.toString(),
-      "nama": widget.pelangganData['nama']?.toString(),
-      "status": statusBaru,
-      "action": "update_status"
-    };
 
     try {
       final response = await http.post(
         Uri.parse(scriptUrl),
         headers: {"Content-Type": "application/json"},
-        body: json.encode(payload),
+        body: json.encode(payloadData),
       );
 
       if (response.statusCode == 200 || response.statusCode == 302) {
         setState(() {
-          widget.pelangganData['status'] = statusBaru;
+          widget.pelangganData['status'] = payloadData['status'];
+          widget.pelangganData['metode_pembayaran'] = payloadData['metode_pembayaran'];
+          widget.pelangganData['diterima_oleh'] = payloadData['diterima_oleh'];
+          widget.pelangganData['jumlah_bulan_tunggakan'] = payloadData['jumlah_bulan_tunggakan'];
+          widget.pelangganData['total_tunggakan'] = payloadData['total_tunggakan'];
+          widget.pelangganData['sisa_tunggakan'] = payloadData['sisa_tunggakan'];
           isUpdating = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status berhasil diubah menjadi $statusBaru')),
+          const SnackBar(content: Text('Status pembayaran & tunggakan berhasil diperbarui!')),
         );
         Navigator.pop(context, true);
       } else {
-        throw Exception('Gagal memperbarui status');
+        throw Exception('Gagal memperbarui ke server');
       }
     } catch (e) {
       setState(() => isUpdating = false);
@@ -246,6 +244,122 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
+  }
+
+  // Dialog Konfirmasi Pembayaran & Custom Tunggakan
+  void _showPaymentDialog() {
+    String selectedMetode = 'Tunai';
+    final TextEditingController penerimaController = TextEditingController();
+    final TextEditingController bulanController = TextEditingController(text: '1');
+    final TextEditingController totalTunggakanController = TextEditingController();
+    final TextEditingController bayarController = TextEditingController();
+
+    // Parse harga paket mentah menjadi angka untuk estimasi
+    String hargaStr = (widget.pelangganData['harga'] ?? '0').toString().replaceAll(RegInMapNumberFilter(), '');
+    // Regex pengganti sederhanakan ambil angka dari string harga (misal: "Rp 120.000" -> 120000)
+    int hargaPaket = int.tryParse(widget.pelangganData['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+    
+    totalTunggakanController.text = hargaPaket.toString();
+    bayarController.text = hargaPaket.toString();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Kelola Pembayaran & Tunggakan'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: bulanController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Jumlah Bulan Tunggakan'),
+                      onChanged: (val) {
+                        int bulan = int.tryParse(val) ?? 1;
+                        int total = bulan * hargaPaket;
+                        setDialogState(() {
+                          totalTunggakanController.text = total.toString();
+                          bayarController.text = total.toString();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: totalTunggakanController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Total Nominal Tunggakan (Rp)'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: bayarController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Jumlah yang Dibayar Sekarang (Rp)',
+                        hintText: 'Misal: bayar 200rb dulu',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Metode Pembayaran'),
+                      value: selectedMetode,
+                      items: ['Tunai', 'QRIS', 'Transfer Bank'].map((metode) {
+                        return DropdownMenuItem(value: metode, child: Text(metode));
+                      }).toList(),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedMetode = val!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: penerimaController,
+                      decoration: const InputDecoration(
+                        labelText: 'Diterima Oleh (Nama Petugas/Kasir)',
+                        hintText: 'Contoh: Admin / Budi',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    int totalTunggakan = int.tryParse(totalTunggakanController.text) ?? 0;
+                    int jumlahBayar = int.tryParse(bayarController.text) ?? 0;
+                    int sisa = totalTunggakan - jumlahBayar;
+                    if (sisa < 0) sisa = 0;
+
+                    String statusBaru = (sisa == 0) ? 'Lunas' : 'Belum Lunas';
+
+                    Navigator.pop(context);
+                    updateStatusData({
+                      "action": "update_status",
+                      "idpel": widget.pelangganData['idpel']?.toString(),
+                      "nama": widget.pelangganData['nama']?.toString(),
+                      "status": statusBaru,
+                      "metode_pembayaran": selectedMetode,
+                      "diterima_oleh": penerimaController.text.isEmpty ? 'Admin' : penerimaController.text,
+                      "jumlah_bulan_tunggakan": bulanController.text,
+                      "total_tunggakan": totalTunggakan.toString(),
+                      "sisa_tunggakan": sisa.toString(),
+                    });
+                  },
+                  child: const Text('Simpan Pembayaran'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -257,7 +371,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
       appBar: AppBar(
         title: Text((widget.pelangganData['nama'] ?? 'Detail Pelanggan').toString()),
         actions: [
-          // Tombol Edit Pelanggan
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
@@ -268,7 +381,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                 ),
               );
               if (updated == true) {
-                Navigator.pop(context, true); // Kembali & refresh ke home
+                Navigator.pop(context, true);
               }
             },
           ),
@@ -310,7 +423,12 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     _buildRow('ID Pelanggan', widget.pelangganData['idpel']?.toString() ?? '-'),
                     _buildRow('Nama', widget.pelangganData['nama']?.toString() ?? '-'),
                     _buildRow('Paket Internet', widget.pelangganData['paket']?.toString() ?? '-'),
-                    _buildRow('Harga', widget.pelangganData['harga']?.toString() ?? '-'),
+                    _buildRow('Harga Paket', widget.pelangganData['harga']?.toString() ?? '-'),
+                    _buildRow('Bulan Tunggakan', '${widget.pelangganData['jumlah_bulan_tunggakan'] ?? '0'} Bulan'),
+                    _buildRow('Total Tunggakan', 'Rp ${widget.pelangganData['total_tunggakan'] ?? '0'}'),
+                    _buildRow('Sisa Tunggakan', 'Rp ${widget.pelangganData['sisa_tunggakan'] ?? '0'}'),
+                    _buildRow('Metode Bayar', widget.pelangganData['metode_pembayaran']?.toString() ?? '-'),
+                    _buildRow('Diterima Oleh', widget.pelangganData['diterima_oleh']?.toString() ?? '-'),
                     _buildRow('Alamat', widget.pelangganData['alamat']?.toString() ?? '-'),
                     _buildRow('No WhatsApp', widget.pelangganData['no_hp']?.toString() ?? '-'),
                     _buildRow('No KTP / NIK', widget.pelangganData['nik']?.toString() ?? '-'),
@@ -330,11 +448,25 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     onPressed: () {
-                      String statusBaru = isLunas ? 'Belum Lunas' : 'Lunas';
-                      updateStatus(statusBaru);
+                      if (isLunas) {
+                        // Reset jika ingin jadikan belum lunas lagi
+                        updateStatusData({
+                          "action": "update_status",
+                          "idpel": widget.pelangganData['idpel']?.toString(),
+                          "nama": widget.pelangganData['nama']?.toString(),
+                          "status": "Belum Lunas",
+                          "metode_pembayaran": "-",
+                          "diterima_oleh": "-",
+                          "jumlah_bulan_tunggakan": "1",
+                          "total_tunggakan": "0",
+                          "sisa_tunggakan": "0",
+                        });
+                      } else {
+                        _showPaymentDialog();
+                      }
                     },
-                    icon: Icon(isLunas ? Icons.warning : Icons.check_circle),
-                    label: Text(isLunas ? 'Ubah ke Belum Lunas' : 'Tandai Sebagai Lunas'),
+                    icon: Icon(isLunas ? Icons.warning : Icons.payment),
+                    label: Text(isLunas ? 'Batalkan Lunas / Reset' : 'Bayar / Catat Tunggakan'),
                   ),
           ],
         ),
@@ -349,7 +481,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 130,
+            width: 140,
             child: Text(
               label,
               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
@@ -453,7 +585,6 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 302) {
-        // Update data lokal
         widget.pelangganData['nama'] = _namaController.text;
         widget.pelangganData['alamat'] = _alamatController.text;
         widget.pelangganData['paket'] = selectedPaket!['nama'];
@@ -734,3 +865,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
     );
   }
 }
+
+// Helper kecil untuk regEx pencarian angka
+RegExp RegInMapNumberFilter() => RegExp(r'[^0-9]');
