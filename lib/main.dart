@@ -149,7 +149,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                   (item['nama'] ?? '').toString(), 
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan (Rp ${item['total_tunggakan'] ?? '0'} incl. PPN 11%)'),
+                                subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan (Rp ${item['total_tunggakan'] ?? '0'} incl. PPN 11%)'),
                                 isThreeLine: true,
                                 trailing: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -248,7 +248,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     }
   }
 
-  // Kirim Nota / Struk menggunakan share_plus (Termasuk PPN 11%)
   void shareStrukWhatsApp() {
     final nama = widget.pelangganData['nama'] ?? '';
     final idpel = widget.pelangganData['idpel'] ?? '';
@@ -275,7 +274,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     Share.share(pesan);
   }
 
-  // Cetak Bukti Pembayaran / Struk Bluetooth Thermal Printer (Termasuk PPN 11%)
   void cetakStrukBluetooth() async {
     List<BluetoothInfo> devices = [];
     try {
@@ -633,6 +631,7 @@ class EditPelangganPage extends StatefulWidget {
 
 class _EditPelangganPageState extends State<EditPelangganPage> {
   final _formKey = GlobalKey<FormState>();
+  late TextEditingController _idpelController;
   late TextEditingController _namaController;
   late TextEditingController _alamatController;
   late TextEditingController _hpController;
@@ -658,6 +657,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   @override
   void initState() {
     super.initState();
+    _idpelController = TextEditingController(text: widget.pelangganData['idpel']?.toString() ?? '');
     _namaController = TextEditingController(text: widget.pelangganData['nama']?.toString() ?? '');
     _alamatController = TextEditingController(text: widget.pelangganData['alamat']?.toString() ?? '');
     _hpController = TextEditingController(text: widget.pelangganData['no_hp']?.toString() ?? '');
@@ -694,7 +694,8 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
 
     final payload = {
       "action": "update_pelanggan",
-      "idpel": widget.pelangganData['idpel']?.toString(),
+      "old_idpel": widget.pelangganData['idpel']?.toString(), // ID lama untuk pencarian di spreadsheet
+      "idpel": _idpelController.text, // ID baru (bisa diubah)
       "nama": _namaController.text,
       "alamat": _alamatController.text,
       "paket": selectedPaket!['nama'],
@@ -716,6 +717,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 302) {
+        widget.pelangganData['idpel'] = _idpelController.text;
         widget.pelangganData['nama'] = _namaController.text;
         widget.pelangganData['alamat'] = _alamatController.text;
         widget.pelangganData['paket'] = selectedPaket!['nama'];
@@ -728,7 +730,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
         widget.pelangganData['total_tunggakan'] = totalTunggakan.toString();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data pelanggan berhasil diperbarui!')),
+          const SnackBar(content: Text('Data pelanggan & IDPEL berhasil diperbarui!')),
         );
         Navigator.pop(context, true);
       } else {
@@ -752,6 +754,12 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
+              TextFormField(
+                controller: _idpelController,
+                decoration: const InputDecoration(labelText: 'ID Pelanggan (IDPEL)'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _namaController,
                 decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
@@ -844,6 +852,7 @@ class TambahPelangganPage extends StatefulWidget {
 
 class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _idpelController = TextEditingController();
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _alamatController = TextEditingController();
   final TextEditingController _hpController = TextEditingController();
@@ -883,6 +892,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
     int totalTunggakan = (hargaInt * bulanInt * 1.11).round();
 
     final payload = {
+      "idpel": _idpelController.text,
       "nama": _namaController.text,
       "alamat": _alamatController.text,
       "paket": selectedPaket!['nama'],
@@ -927,6 +937,11 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
+              TextFormField(
+                controller: _idpelController,
+                decoration: const InputDecoration(labelText: 'ID Pelanggan (Opsional, kosongkan untuk auto BM00x)'),
+              ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _namaController,
                 decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
