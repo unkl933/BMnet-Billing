@@ -15,7 +15,7 @@ plugins {
 }
 
 android {
-    namespace = "id.unk1933.bmnet" // sesuaikan dengan namespace/package name Anda
+    namespace = "id.unkl933.bmnet" // sesuaikan dengan namespace/package name Anda
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,7 +29,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "id.unk1933.bmnet"
+        applicationId = "id.unkl933.bmnet"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
