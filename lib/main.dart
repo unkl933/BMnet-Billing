@@ -19,7 +19,7 @@ class BillingHomePage extends StatefulWidget {
 }
 
 class _BillingHomePageState extends State<BillingHomePage> {
-  List<dynamic> pelanggan = [];
+  List pelanggan = [];
   bool isLoading = true;
 
   @override
@@ -110,7 +110,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _nikController = TextEditingController();
   final TextEditingController _salesController = TextEditingController();
 
-  final List> daftarPaket = [
+  var daftarPaket = [
     {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
     {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
     {'nama': 'Paket Building (Free Android TV)', 'harga': 'Rp 121.622'},
@@ -185,17 +185,17 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
                 items: daftarPaket.map((paket) {
-                  return DropdownMenuItem>(
+                  return DropdownMenuItem(
                     value: paket,
                     child: Text('${paket['nama']} (${paket['harga']})'),
                   );
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedPaket = val;
+                    selectedPaket = val as Map<String, dynamic>?;
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
