@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -358,7 +357,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     int hargaPaket = int.tryParse(widget.pelangganData['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
     int initialBulan = int.tryParse(bulanController.text) ?? 1;
     
-    // Hitung dengan PPN 11%
     int calculatedTotal = (hargaPaket * initialBulan * 1.11).round();
     totalTunggakanController.text = calculatedTotal.toString();
     bayarController.text = calculatedTotal.toString();
@@ -692,7 +690,6 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
 
     int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
     int bulanInt = int.tryParse(_bulanController.text) ?? 1;
-    // Hitung total dengan PPN 11%
     int totalTunggakan = (hargaInt * bulanInt * 1.11).round();
 
     final payload = {
@@ -883,7 +880,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
     int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
     int bulanInt = int.tryParse(_bulanController.text) ?? 1;
-    // Hitung total dengan PPN 11%
     int totalTunggakan = (hargaInt * bulanInt * 1.11).round();
 
     final payload = {
