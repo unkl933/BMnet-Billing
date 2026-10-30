@@ -1,4 +1,4 @@
-import 'dart0:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -266,7 +266,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     final totalStr = widget.pelangganData['total_tunggakan']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '0';
     final totalInt = int.tryParse(totalStr) ?? 0;
 
-    // Kalkulasi Subtotal & PPN 11%
     final subtotalInt = (totalInt / 1.11).round();
     final ppnInt = totalInt - subtotalInt;
 
@@ -287,14 +286,13 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
           return pw.Column(
-            cross pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // HEADER KOP SURAT
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
-                    cross: pw.CrossAxisAlignment.start,
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text('BMnet ISP', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                       pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
@@ -302,7 +300,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     ],
                   ),
                   pw.Column(
-                    cross: pw.CrossAxisAlignment.end,
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
                       pw.Text(
                         isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', 
@@ -317,17 +315,15 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
               pw.SizedBox(height: 10),
               pw.Divider(thickness: 1.5, color: PdfColors.blue800),
               pw.SizedBox(height: 10),
-
-              // TABEL DATA PELANGGAN & RINCIAN TAGIHAN
               pw.Row(
-                cross: pw.CrossAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
                     child: pw.Container(
                       padding: const pw.EdgeInsets.all(8),
                       decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: pw.BorderRadius.circular(4)),
                       child: pw.Column(
-                        cross: pw.CrossAxisAlignment.start,
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                           pw.SizedBox(height: 4),
@@ -345,7 +341,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       padding: const pw.EdgeInsets.all(8),
                       decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: pw.BorderRadius.circular(4)),
                       child: pw.Column(
-                        cross: pw.CrossAxisAlignment.start,
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text(isLunas ? 'INFORMASI PELUNASAN' : 'RINCIAN TAGIHAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                           pw.SizedBox(height: 4),
@@ -366,8 +362,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                 ],
               ),
               pw.SizedBox(height: 15),
-
-              // TABEL DETAIL PAKET INTERNET
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400),
                 columnWidths: {
@@ -394,7 +388,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(5),
                         child: pw.Column(
-                          cross: pw.CrossAxisAlignment.start,
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
                             pw.Text(paket, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                             pw.Text('Langganan Akses Internet Unlimited Periode Oktober ${now.year}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
@@ -409,11 +403,9 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                 ],
               ),
               pw.SizedBox(height: 10),
-
-              // RINGKASAN SUB-TOTAL & PPN
               pw.Row(
-                mainpw.MainAxisAlignment.spaceBetween,
-                cross: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
                     flex: 6,
@@ -427,7 +419,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                             padding: const pw.EdgeInsets.all(8),
                             decoration: pw.BoxDecoration(color: PdfColors.grey100, border: pw.Border.all(color: PdfColors.grey300)),
                             child: pw.Column(
-                              cross: pw.CrossAxisAlignment.start,
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
                               children: [
                                 pw.Text('Instruksi Pembayaran Transfer / QRIS:', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
                                 pw.Text('• Bank BCA: 123-456-7890 a/n BMnet ISP', style: const pw.TextStyle(fontSize: 8)),
@@ -472,19 +464,17 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                 ],
               ),
               pw.SizedBox(height: 20),
-
-              // PERHATIAN & TANDA TANGAN
               if (!isLunas)
                 pw.Text(
                   'PERHATIAN: Mohon lakukan pembayaran sebelum tanggal jatuh tempo untuk menghindari pembatasan/isolir otomatis jaringan internet Anda. Apabila telah melakukan pembayaran, abaikan nota penagihan ini.',
                   style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700),
                 ),
-              
               pw.Spacer(),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
                       pw.Text('Pelanggan,', style: const pw.TextStyle(fontSize: 9)),
                       pw.SizedBox(height: 35),
@@ -492,6 +482,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     ],
                   ),
                   pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
                       pw.Text('Finance / Petugas Billing,', style: const pw.TextStyle(fontSize: 9)),
                       pw.SizedBox(height: 35),
@@ -514,7 +505,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     return pdf;
   }
 
-  // 1. FUNGSI KIRIM FILE PDF DIRECT KE WHATSAPP VIA SHARE_PLUS
   Future<void> sharePdfToWhatsApp(bool isLunas) async {
     try {
       final pdfDoc = await _buildPdfDocument(isLunas);
@@ -526,7 +516,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
       final file = File("${outputDir.path}/$fileName");
       await file.writeAsBytes(bytes);
 
-      // Share File PDF Langsung
       await Share.shareXFiles(
         [XFile(file.path)],
         text: isLunas 
@@ -540,7 +529,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     }
   }
 
-  // 2. FUNGSI CETAK DOKUMEN PDF KE PRINTER (A4 / THERMAL)
   Future<void> printPdfDocument(bool isLunas) async {
     final pdfDoc = await _buildPdfDocument(isLunas);
     final idpel = widget.pelangganData['idpel'] ?? 'BMnet';
@@ -550,7 +538,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     );
   }
 
-  // 3. FUNGSI CETAK STRUK MINI THERMAL BLUETOOTH (POS 58mm)
   void cetakStrukBluetoothPOS() async {
     List<BluetoothInfo> devices = [];
     try {
