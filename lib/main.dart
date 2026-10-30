@@ -69,12 +69,25 @@ class _BillingHomePageState extends State<BillingHomePage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
-                        leading: CircleAvatar(child: Text('${item['no'] ?? index + 1}')),
-                        title: Text(item['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          'IDPEL: ${item['idpel']}\nPaket: ${item['paket']} (${item['harga']})\nAlamat: ${item['alamat']}\nWA: ${item['no_hp']} | Tempo: ${item['jatuh_tempo']}',
+                        leading: CircleAvatar(
+                          child: Text('${item['no'] ?? index + 1}'),
                         ),
-                        isThreeLine: true,
+                        // Hanya menampilkan Nama dan Paket di halaman utama
+                        title: Text(
+                          item['nama'] ?? '', 
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text('Paket: ${item['paket'] ?? '-'}'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          // Ketika diklik, buka halaman detail pelanggan
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetailPelangganPage(pelangganData: item),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
@@ -95,6 +108,75 @@ class _BillingHomePageState extends State<BillingHomePage> {
   }
 }
 
+// ================= Halaman Detail Pelanggan =================
+class DetailPelangganPage extends StatelessWidget {
+  final Map<String, dynamic> pelangganData;
+
+  const DetailPelangganPage({super.key, required this.pelangganData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(pelangganData['nama'] ?? 'Detail Pelanggan'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildRow('ID Pelanggan', pelangganData['idpel'] ?? '-'),
+                    _buildRow('Nama', pelangganData['nama'] ?? '-'),
+                    _buildRow('Paket Internet', pelangganData['paket'] ?? '-'),
+                    _buildRow('Harga', pelangganData['harga'] ?? '-'),
+                    _buildRow('Alamat', pelangganData['alamat'] ?? '-'),
+                    _buildRow('No WhatsApp', pelangganData['no_hp'] ?? '-'),
+                    _buildRow('No KTP / NIK', pelangganData['nik'] ?? '-'),
+                    _buildRow('Jatuh Tempo', pelangganData['jatuh_tempo'] ?? '-'),
+                    _buildRow('Sales', pelangganData['sales'] ?? '-'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ================= Halaman Tambah Pelanggan =================
 class TambahPelangganPage extends StatefulWidget {
   const TambahPelangganPage({super.key});
 
