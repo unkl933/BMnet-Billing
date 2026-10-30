@@ -23,7 +23,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
   List filteredPelanggan = [];
   bool isLoading = true;
   String searchQuery = '';
-  String sortBy = 'default'; // 'default', 'nama', 'alamat', 'paket'
+  String sortBy = 'default'; // 'default', 'nama', 'alamat', 'paket', 'lunas', 'belum_lunas'
 
   @override
   void initState() {
@@ -61,13 +61,17 @@ class _BillingHomePageState extends State<BillingHomePage> {
       }).toList();
     }
 
-    // 2. Sorting (Pengurutan)
+    // 2. Sorting & Filter berdasarkan Status / Kategori
     if (sortBy == 'alamat') {
       temp.sort((a, b) => (a['alamat'] ?? '').toString().compareTo((b['alamat'] ?? '').toString()));
     } else if (sortBy == 'paket') {
       temp.sort((a, b) => (a['paket'] ?? '').toString().compareTo((b['paket'] ?? '').toString()));
     } else if (sortBy == 'nama') {
       temp.sort((a, b) => (a['nama'] ?? '').toString().compareTo((b['nama'] ?? '').toString()));
+    } else if (sortBy == 'lunas') {
+      temp = temp.where((item) => (item['status'] ?? 'Belum Lunas').toString().toLowerCase() == 'lunas').toList();
+    } else if (sortBy == 'belum_lunas') {
+      temp = temp.where((item) => (item['status'] ?? 'Belum Lunas').toString().toLowerCase() != 'lunas').toList();
     }
 
     setState(() {
@@ -81,7 +85,6 @@ class _BillingHomePageState extends State<BillingHomePage> {
       appBar: AppBar(
         title: Text('Billing Mini ISP (${filteredPelanggan.length} Pelanggan)'),
         actions: [
-          // Menu Sorting
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             onSelected: (value) {
@@ -95,6 +98,8 @@ class _BillingHomePageState extends State<BillingHomePage> {
               const PopupMenuItem(value: 'nama', child: Text('Urutkan Nama')),
               const PopupMenuItem(value: 'alamat', child: Text('Urutkan Alamat')),
               const PopupMenuItem(value: 'paket', child: Text('Urutkan Paket')),
+              const PopupMenuItem(value: 'lunas', child: Text('Filter: Sudah Lunas')),
+              const PopupMenuItem(value: 'belum_lunas', child: Text('Filter: Belum Lunas')),
             ],
           ),
           IconButton(
@@ -107,7 +112,6 @@ class _BillingHomePageState extends State<BillingHomePage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Kotak Pencarian Nama Pelanggan
                 Padding(
                   padding: const EdgeInsets.all(10.0),
                   child: TextField(
@@ -132,6 +136,9 @@ class _BillingHomePageState extends State<BillingHomePage> {
                           itemCount: filteredPelanggan.length,
                           itemBuilder: (context, index) {
                             final item = filteredPelanggan[index];
+                            final status = item['status'] ?? 'Belum Lunas';
+                            final isLunas = status.toString().toLowerCase() == 'lunas';
+
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               child: ListTile(
@@ -142,16 +149,33 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                   item['nama'] ?? '', 
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text('Alamat: ${item['alamat'] ?? '-'}\nPaket: ${item['paket'] ?? '-'}'),
+                                subtitle: Text('Paket: ${item['paket'] ?? '-'}\nJatuh Tempo: ${item['jatuh_tempo'] ?? 'Tanggal 5'}'),
                                 isThreeLine: true,
-                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                onTap: () {
-                                  Navigator.push(
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: TextStyle(
+                                      color: isLunas ? Colors.green.shade800 : Colors.red.shade800,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                onTap: () async {
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => DetailPelangganPage(pelangganData: item),
                                     ),
                                   );
+                                  if (result == true) {
+                                    fetchPelanggan();
+                                  }
                                 },
                               ),
                             );
@@ -177,16 +201,62 @@ class _BillingHomePageState extends State<BillingHomePage> {
 }
 
 // ================= Halaman Detail Pelanggan =================
-class DetailPelangganPage extends StatelessWidget {
+class DetailPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
 
   const DetailPelangganPage({super.key, required this.pelangganData});
 
   @override
+  State<DetailPelangganPage> createState() => _DetailPelangganPageState();
+}
+
+class _DetailPelangganPageState extends State<DetailPelangganPage> {
+  bool isUpdating = false;
+
+  Future<void> updateStatus(String statusBaru) async {
+    setState(() => isUpdating = true);
+
+    final payload = {
+      "idpel": widget.pelangganData['idpel'],
+      "nama": widget.pelangganData['nama'],
+      "status": statusBaru,
+      "action": "update_status"
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(scriptUrl),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        setState(() {
+          widget.pelangganData['status'] = statusBaru;
+          isUpdating = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Status berhasil diubah menjadi $statusBaru')),
+        );
+      } else {
+        throw Exception('Gagal memperbarui status');
+      }
+    } catch (e) {
+      setState(() => isUpdating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final status = widget.pelangganData['status'] ?? 'Belum Lunas';
+    final isLunas = status.toString().toLowerCase() == 'lunas';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(pelangganData['nama'] ?? 'Detail Pelanggan'),
+        title: Text(widget.pelangganData['nama'] ?? 'Detail Pelanggan'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -200,19 +270,56 @@ class DetailPelangganPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildRow('ID Pelanggan', pelangganData['idpel'] ?? '-'),
-                    _buildRow('Nama', pelangganData['nama'] ?? '-'),
-                    _buildRow('Paket Internet', pelangganData['paket'] ?? '-'),
-                    _buildRow('Harga', pelangganData['harga'] ?? '-'),
-                    _buildRow('Alamat', pelangganData['alamat'] ?? '-'),
-                    _buildRow('No WhatsApp', pelangganData['no_hp'] ?? '-'),
-                    _buildRow('No KTP / NIK', pelangganData['nik'] ?? '-'),
-                    _buildRow('Jatuh Tempo', pelangganData['jatuh_tempo'] ?? '-'),
-                    _buildRow('Sales', pelangganData['sales'] ?? '-'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Status Pembayaran:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              color: isLunas ? Colors.green.shade800 : Colors.red.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 25),
+                    _buildRow('ID Pelanggan', widget.pelangganData['idpel'] ?? '-'),
+                    _buildRow('Nama', widget.pelangganData['nama'] ?? '-'),
+                    _buildRow('Paket Internet', widget.pelangganData['paket'] ?? '-'),
+                    _buildRow('Harga', widget.pelangganData['harga'] ?? '-'),
+                    _buildRow('Alamat', widget.pelangganData['alamat'] ?? '-'),
+                    _buildRow('No WhatsApp', widget.pelangganData['no_hp'] ?? '-'),
+                    _buildRow('No KTP / NIK', widget.pelangganData['nik'] ?? '-'),
+                    _buildRow('Jatuh Tempo', widget.pelangganData['jatuh_tempo'] ?? 'Tanggal 5'),
+                    _buildRow('Sales', widget.pelangganData['sales'] ?? '-'),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            isUpdating
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isLunas ? Colors.orange : Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      String statusBaru = isLunas ? 'Belum Lunas' : 'Lunas';
+                      updateStatus(statusBaru);
+                    },
+                    icon: Icon(isLunas ? Icons.warning : Icons.check_circle),
+                    label: Text(isLunas ? 'Ubah ke Belum Lunas' : 'Tandai Sebagai Lunas'),
+                  ),
           ],
         ),
       ),
@@ -270,7 +377,12 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   ];
 
   Map<String, dynamic>? selectedPaket;
+  String selectedJatuhTempo = 'Tanggal 5';
+  String selectedStatus = 'Belum Lunas';
   bool isSaving = false;
+
+  final List<String> daftarJatuhTempo = ['Tanggal 5', 'Tanggal 10', 'Tanggal 15', 'Tanggal 20', 'Tanggal 25'];
+  final List<String> daftarStatus = ['Belum Lunas', 'Lunas'];
 
   Future<void> simpanPelanggan() async {
     if (!_formKey.currentState!.validate() || selectedPaket == null) {
@@ -289,7 +401,8 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
       "harga": selectedPaket!['harga'],
       "no_hp": _hpController.text,
       "nik": _nikController.text,
-      "jatuh_tempo": "Tanggal 5",
+      "jatuh_tempo": selectedJatuhTempo,
+      "status": selectedStatus,
       "sales": _salesController.text,
     };
 
@@ -349,6 +462,32 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
+                value: selectedJatuhTempo,
+                items: daftarJatuhTempo.map((tgl) {
+                  return DropdownMenuItem(value: tgl, child: Text(tgl));
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    selectedJatuhTempo = val!;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Status Pembayaran Awal'),
+                value: selectedStatus,
+                items: daftarStatus.map((st) {
+                  return DropdownMenuItem(value: st, child: Text(st));
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    selectedStatus = val!;
+                  });
+                },
               ),
               const SizedBox(height: 10),
               TextFormField(
