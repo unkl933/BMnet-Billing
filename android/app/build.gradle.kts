@@ -1,7 +1,7 @@
 import java.io.FileInputStream
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// Read key.properties
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -15,17 +15,13 @@ plugins {
 }
 
 android {
-    namespace = "id.unkl933.bmnet" // sesuaikan dengan namespace/package name Anda
+    namespace = "id.unkl933.bmnet"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8"
     }
 
     defaultConfig {
@@ -47,9 +43,15 @@ android {
 
     buildTypes {
         getByName("release") {
-            // Menggunakan signingConfig release yang telah didefinisikan
             signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+// Menggunakan compilerOptions baru pengganti kotlinOptions
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_1_8)
     }
 }
 
