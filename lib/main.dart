@@ -20,7 +20,10 @@ class BillingHomePage extends StatefulWidget {
 
 class _BillingHomePageState extends State<BillingHomePage> {
   List pelanggan = [];
+  List filteredPelanggan = [];
   bool isLoading = true;
+  String searchQuery = '';
+  String sortBy = 'default'; // 'default', 'nama', 'alamat', 'paket'
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
       if (response.statusCode == 200 || response.statusCode == 302) {
         setState(() {
           pelanggan = json.decode(response.body);
+          _applyFilterAndSort();
           isLoading = false;
         });
       }
@@ -46,12 +50,53 @@ class _BillingHomePageState extends State<BillingHomePage> {
     }
   }
 
+  void _applyFilterAndSort() {
+    List temp = List.from(pelanggan);
+
+    // 1. Filter berdasarkan pencarian nama
+    if (searchQuery.isNotEmpty) {
+      temp = temp.where((item) {
+        final nama = (item['nama'] ?? '').toString().toLowerCase();
+        return nama.contains(searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // 2. Sorting (Pengurutan)
+    if (sortBy == 'alamat') {
+      temp.sort((a, b) => (a['alamat'] ?? '').toString().compareTo((b['alamat'] ?? '').toString()));
+    } else if (sortBy == 'paket') {
+      temp.sort((a, b) => (a['paket'] ?? '').toString().compareTo((b['paket'] ?? '').toString()));
+    } else if (sortBy == 'nama') {
+      temp.sort((a, b) => (a['nama'] ?? '').toString().compareTo((b['nama'] ?? '').toString()));
+    }
+
+    setState(() {
+      filteredPelanggan = temp;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Billing Mini ISP (${pelanggan.length} Pelanggan)'),
+        title: Text('Billing Mini ISP (${filteredPelanggan.length} Pelanggan)'),
         actions: [
+          // Menu Sorting
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            onSelected: (value) {
+              setState(() {
+                sortBy = value;
+                _applyFilterAndSort();
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'default', child: Text('Urutan Default')),
+              const PopupMenuItem(value: 'nama', child: Text('Urutkan Nama')),
+              const PopupMenuItem(value: 'alamat', child: Text('Urutkan Alamat')),
+              const PopupMenuItem(value: 'paket', child: Text('Urutkan Paket')),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: fetchPelanggan,
@@ -60,38 +105,61 @@ class _BillingHomePageState extends State<BillingHomePage> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : pelanggan.isEmpty
-              ? const Center(child: Text('Belum ada data pelanggan.'))
-              : ListView.builder(
-                  itemCount: pelanggan.length,
-                  itemBuilder: (context, index) {
-                    final item = pelanggan[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          child: Text('${item['no'] ?? index + 1}'),
-                        ),
-                        // Hanya menampilkan Nama dan Paket di halaman utama
-                        title: Text(
-                          item['nama'] ?? '', 
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text('Paket: ${item['paket'] ?? '-'}'),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {
-                          // Ketika diklik, buka halaman detail pelanggan
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailPelangganPage(pelangganData: item),
-                            ),
-                          );
-                        },
+          : Column(
+              children: [
+                // Kotak Pencarian Nama Pelanggan
+                Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      labelText: 'Cari Nama Pelanggan...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    );
-                  },
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    onChanged: (value) {
+                      searchQuery = value;
+                      _applyFilterAndSort();
+                    },
+                  ),
                 ),
+                Expanded(
+                  child: filteredPelanggan.isEmpty
+                      ? const Center(child: Text('Data pelanggan tidak ditemukan.'))
+                      : ListView.builder(
+                          itemCount: filteredPelanggan.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredPelanggan[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  child: Text('${item['no'] ?? index + 1}'),
+                                ),
+                                title: Text(
+                                  item['nama'] ?? '', 
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text('Alamat: ${item['alamat'] ?? '-'}\nPaket: ${item['paket'] ?? '-'}'),
+                                isThreeLine: true,
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DetailPelangganPage(pelangganData: item),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
