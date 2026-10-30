@@ -1,85 +1,87 @@
-# BMnet-Billing 🚀
+# 📶 BMnet Billing - Application System Mini ISP
 
-**BMnet-Billing** adalah aplikasi mobile berbasis Flutter yang dirancang khusus untuk mengelola sistem penagihan (*billing*) pada usaha Mikro Internet Service Provider (Mini ISP). Aplikasi ini terintegrasi secara *real-time* dengan **Google Sheets** menggunakan **Google Apps Script** sebagai REST API tanpa memerlukan konfigurasi backend yang rumit.
-
----
-
-## 📌 Fitur Utama
-* **Manajemen Data Pelanggan**: Menampilkan daftar lengkap seluruh pelanggan secara dinamis.
-* **Tambah Pelanggan Baru**: Form input data terstruktur (Nama, Alamat, Paket, No WhatsApp, NIK, dan Sales).
-* **Auto-Generate IDPEL**: Sistem secara otomatis membuat ID Pelanggan unik jika dikosongkan saat pendaftaran.
-* **Integrasi Google Spreadsheet**: Penyimpanan data terpusat di cloud yang mudah diakses, diexport, dan dibagikan.
+Aplikasi manajemen billing dan operasional *Mini ISP* berbasis Flutter yang terintegrasi secara *real-time* dengan Google Sheets melalui Google Apps Script (GAS). Aplikasi ini mempermudah pencatatan pelanggan, pengelolaan tunggakan, kalkulasi pajak PPN 11%, pencetakan struk pembayaran via Bluetooth Thermal Printer, serta pembagian nota digital via WhatsApp.
 
 ---
 
-## 📋 Daftar Paket Internet & Harga
-Berdasarkan data operasional aktif, berikut adalah pilihan paket yang didukung oleh sistem:
-* **LITE 7 Mbps** — Rp 90.090 / bulan
-* **BASIC 10 Mbps** — Rp 108.108 / bulan
-* **Paket Building (Free Android TV)** — Rp 121.622 / bulan
-* **STANDAR 15 Mbps** — Rp 135.135 / bulan
-* **25 Mbps** — Rp 200.000 / bulan
-* **50 Mbps** — Rp 500.000 / bulan
+## 🌟 Fitur Utama
+
+- **Management Data Pelanggan:**
+  - Tambah, Edit, dan Hapus data pelanggan secara *real-time*.
+  - Pencarian fleksibel berdasarkan nama pelanggan.
+  - Pengurutan data (Berdasarkan Nama, Alamat, Paket, Status Lunas / Belum Lunas).
+- **Sistem Pembayaran & Tunggakan:**
+  - Perhitungan **PPN 11%** otomatis dari harga dasar paket.
+  - Pencatatan jumlah bulan tunggakan dan pembagian nominal pembayaran (Lunas / Pembayaran Sebagian / Cicilan).
+  - Pilihan metode pembayaran yang beragam (**Tunai**, **QRIS**, **Transfer Bank**).
+  - Pencatatan nama petugas/kasir penerima pembayaran.
+- **Cetak Struk & Pembagian Digital:**
+  - **Bluetooth Thermal Printer Integration:** Cetak struk fisik langsung ke printer kasir portable/thermal bluetooth.
+  - **Share Struk via WhatsApp (`share_plus`):** Bagikan teks bukti pembayaran resmi beserta detail transaksi langsung ke aplikasi WhatsApp pelanggan.
 
 ---
 
-## 📊 Struktur Kolom Google Sheets
-Pastikan sheet pertama pada Google Spreadsheet Anda menggunakan format kolom berikut agar sinkron dengan aplikasi:
+## 💰 Daftar Harga Paket Internet (Termasuk PPN 11%)
 
-| Kolom | Header Spreadsheet | Keterangan |
+Berikut adalah rincian perhitungan harga dasar paket internet setelah ditambahkan kalkulasi otomatis **PPN 11%**:
+
+| Nama Paket Internet | Harga Dasar (Excl. PPN) | PPN 11% | Total Harga (Incl. PPN 11%) |
+| :--- | :---: | :---: | :---: |
+| **LITE 7 Mbps** | Rp 90.090 | Rp 9.910 | **Rp 100.000** |
+| **BASIC 10 Mbps** | Rp 108.108 | Rp 11.892 | **Rp 120.000** |
+| **Paket Building (Free Android TV)** | Rp 121.622 | Rp 13.378 | **Rp 135.000** |
+| **STANDAR 15 Mbps** | Rp 135.135 | Rp 14.865 | **Rp 150.000** |
+| **25 Mbps** | Rp 200.000 | Rp 22.000 | **Rp 222.000** |
+| **50 Mbps** | Rp 500.000 | Rp 55.000 | **Rp 555.000** |
+
+---
+
+## 🧾 Struktur Kolom Spreadsheet (Google Apps Script)
+
+Proses penyimpanan data di Google Sheets memanfaatkan urutan kolom berikut:
+
+| Index | Nama Kolom | Keterangan |
 | :---: | :--- | :--- |
-| **A** | `NO` | Nomor urut pelanggan |
-| **B** | `NAMA` | Nama lengkap pelanggan |
-| **C** | `IDPEL` | ID Pelanggan unik (misal: `027260713004`) |
-| **D** | `ALAMAT` | Alamat lokasi / kampung |
-| **E** | `NO KTP` / `NIK` | Nomor Identitas Kependudukan |
-| **F** | `NO WA` | Nomor WhatsApp aktif |
-| **G** | `PAKET` | Nama paket internet yang dilanggan |
-| **H** | `HARGA` | Nominal tagihan bulanan |
-| **I** | `JATUH TEMPO` | Tanggal jatuh tempo pembayaran (cth: Tanggal 5) |
-| **J** | `SALES` | Nama sales/petugas pencatat (opsional) |
+| **A** | `no` | Nomor Urut |
+| **B** | `idpel` | ID Pelanggan (Contoh: `BM001`) |
+| **C** | `nama` | Nama Lengkap Pelanggan |
+| **D** | `alamat` | Alamat Rumah / Pemasangan |
+| **E** | `paket` | Nama Paket Internet |
+| **F** | `harga` | Harga Dasar Paket |
+| **G** | `no_hp` | Nomor WhatsApp |
+| **H** | `nik` | Nomor KTP / NIK |
+| **I** | `jatuh_tempo` | Tanggal Jatuh Tempo (Misal: Tanggal 5) |
+| **J** | `status` | Status Tagihan (`Lunas` / `Belum Lunas`) |
+| **K** | `sales` | Nama Sales Pemasangan |
+| **L** | `metode_pembayaran` | Tunai / QRIS / Transfer Bank |
+| **M** | `diterima_oleh` | Nama Kasir / Admin Penerima |
+| **N** | `jumlah_bulan_tunggakan` | Durasi Tunggakan (Bulan) |
+| **O** | `total_tunggakan` | Total Nominal Tagihan (Incl. PPN 11%) |
+| **P** | `sisa_tunggakan` | Sisa Tagihan (Jika Pembayaran Sebagian) |
 
 ---
 
-## 🛠️ Persyaratan Sistem & Instalasi
-1. **Flutter SDK** (Versi terbaru disarankan).
-2. Koneksi internet untuk sinkronisasi data Google Sheets.
-3. Tambahkan dependency `http` pada file `pubspec.yaml` proyek Anda:
-   ```yaml
-   dependencies:
-     flutter:
-       sdk: flutter
-     http: ^1.2.0
-   ```
+## 🛠️ Stack Teknologi & Dependensi Utama
+
+- **Framework:** [Flutter](https://flutter.dev) (Dart)
+- **Backend Storage:** Google Sheets API via Google Apps Script (Web App)
+- **CI/CD:** GitHub Actions (Automated Flutter Release Build)
+- **Dependencies (`pubspec.yaml`):**
+  - `http`: Pengiriman request HTTP API.
+  - `print_bluetooth_thermal`: Integrasi koneksi & cetak printer thermal bluetooth.
+  - `share_plus`: Fitur pembagian teks nota/struk pembayaran.
 
 ---
 
-## 🚀 Panduan Menjalankan Proyek
+## 🚀 Panduan Deploy GitHub Actions
 
-1. **Clone Repositori Ini**:
+Repositori ini telah dikonfigurasi dengan workflow otomatis untuk membuat APK *Release* secara terotomatisasi.
+
+1. Lakukan *commit* dan *push* perubahan kode ke *branch* `main`:
    ```bash
-   git clone https://github.com/USERNAME_ANDA/BMnet-Billing.git
-   cd BMnet-Billing
+   git add .
+   git commit -m "feat: pembaruan aplikasi dan dokumentasi"
+   git push origin main
    ```
-
-2. **Install Dependencies**:
-   ```bash
-   flutter pub get
-   ```
-
-3. **Konfigurasi URL Backend**:
-   * Buat Google Apps Script di Google Sheets Anda.
-   * Masukkan URL Web App Google Apps Script ke dalam variabel `scriptUrl` di file `lib/main.dart`:
-     ```dart
-     const String scriptUrl = 'URL_WEB_APP_GOOGLE_APPS_SCRIPT_ANDA';
-     ```
-
-4. **Jalankan Aplikasi**:
-   ```bash
-   flutter run
-   ```
-
----
-
-## 📄 Lisensi
-Proyek ini bersifat open-source dan bebas digunakan untuk kebutuhan pengelolaan jaringan RT/RW Net atau Mini ISP Anda.
+2. Buka tab **Actions** di repositori GitHub (`BMnet-Billing`).
+3. Pilih workflow **Build Release APK** untuk mengunduh file `.apk` terbaru hasil kompilasi.
