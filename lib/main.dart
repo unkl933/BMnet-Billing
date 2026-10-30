@@ -136,8 +136,8 @@ class _BillingHomePageState extends State<BillingHomePage> {
                           itemCount: filteredPelanggan.length,
                           itemBuilder: (context, index) {
                             final item = filteredPelanggan[index];
-                            final status = item['status'] ?? 'Belum Lunas';
-                            final isLunas = status.toString().toLowerCase() == 'lunas';
+                            final status = (item['status'] ?? 'Belum Lunas').toString();
+                            final isLunas = status.toLowerCase() == 'lunas';
 
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -146,7 +146,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                   child: Text('${item['no'] ?? index + 1}'),
                                 ),
                                 title: Text(
-                                  item['nama'] ?? '', 
+                                  (item['nama'] ?? '').toString(), 
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text('Paket: ${item['paket'] ?? '-'}\nJatuh Tempo: ${item['jatuh_tempo'] ?? 'Tanggal 5'}'),
@@ -217,8 +217,8 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     setState(() => isUpdating = true);
 
     final payload = {
-      "idpel": widget.pelangganData['idpel'],
-      "nama": widget.pelangganData['nama'],
+      "idpel": widget.pelangganData['idpel']?.toString(),
+      "nama": widget.pelangganData['nama']?.toString(),
       "status": statusBaru,
       "action": "update_status"
     };
@@ -251,12 +251,12 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.pelangganData['status'] ?? 'Belum Lunas';
-    final isLunas = status.toString().toLowerCase() == 'lunas';
+    final status = (widget.pelangganData['status'] ?? 'Belum Lunas').toString();
+    final isLunas = status.toLowerCase() == 'lunas';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.pelangganData['nama'] ?? 'Detail Pelanggan'),
+        title: Text((widget.pelangganData['nama'] ?? 'Detail Pelanggan').toString()),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -291,15 +291,15 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       ],
                     ),
                     const Divider(height: 25),
-                    _buildRow('ID Pelanggan', widget.pelangganData['idpel'] ?? '-'),
-                    _buildRow('Nama', widget.pelangganData['nama'] ?? '-'),
-                    _buildRow('Paket Internet', widget.pelangganData['paket'] ?? '-'),
-                    _buildRow('Harga', widget.pelangganData['harga'] ?? '-'),
-                    _buildRow('Alamat', widget.pelangganData['alamat'] ?? '-'),
-                    _buildRow('No WhatsApp', widget.pelangganData['no_hp'] ?? '-'),
-                    _buildRow('No KTP / NIK', widget.pelangganData['nik'] ?? '-'),
-                    _buildRow('Jatuh Tempo', widget.pelangganData['jatuh_tempo'] ?? 'Tanggal 5'),
-                    _buildRow('Sales', widget.pelangganData['sales'] ?? '-'),
+                    _buildRow('ID Pelanggan', widget.pelangganData['idpel']?.toString() ?? '-'),
+                    _buildRow('Nama', widget.pelangganData['nama']?.toString() ?? '-'),
+                    _buildRow('Paket Internet', widget.pelangganData['paket']?.toString() ?? '-'),
+                    _buildRow('Harga', widget.pelangganData['harga']?.toString() ?? '-'),
+                    _buildRow('Alamat', widget.pelangganData['alamat']?.toString() ?? '-'),
+                    _buildRow('No WhatsApp', widget.pelangganData['no_hp']?.toString() ?? '-'),
+                    _buildRow('No KTP / NIK', widget.pelangganData['nik']?.toString() ?? '-'),
+                    _buildRow('Jatuh Tempo', widget.pelangganData['jatuh_tempo']?.toString() ?? 'Tanggal 5'),
+                    _buildRow('Sales', widget.pelangganData['sales']?.toString() ?? '-'),
                   ],
                 ),
               ),
