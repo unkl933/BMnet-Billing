@@ -1,4 +1,4 @@
-import 'dart02:json' show json;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -236,7 +236,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Status berhasil diubah menjadi $statusBaru')),
         );
-        Navigator.pop(context, true); // Kembali & refresh halaman utama
+        Navigator.pop(context, true);
       } else {
         throw Exception('Gagal memperbarui status');
       }
@@ -256,6 +256,23 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text((widget.pelangganData['nama'] ?? 'Detail Pelanggan').toString()),
+        actions: [
+          // Tombol Edit Pelanggan
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              final updated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditPelangganPage(pelangganData: widget.pelangganData),
+                ),
+              );
+              if (updated == true) {
+                Navigator.pop(context, true); // Kembali & refresh ke home
+              }
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -345,6 +362,202 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ================= Halaman Edit Pelanggan =================
+class EditPelangganPage extends StatefulWidget {
+  final Map<String, dynamic> pelangganData;
+
+  const EditPelangganPage({super.key, required this.pelangganData});
+
+  @override
+  State<EditPelangganPage> createState() => _EditPelangganPageState();
+}
+
+class _EditPelangganPageState extends State<EditPelangganPage> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _namaController;
+  late TextEditingController _alamatController;
+  late TextEditingController _hpController;
+  late TextEditingController _nikController;
+  late TextEditingController _salesController;
+
+  var daftarPaket = [
+    {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
+    {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
+    {'nama': 'Paket Building (Free Android TV)', 'harga': 'Rp 121.622'},
+    {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
+    {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
+    {'nama': '50 Mbps', 'harga': 'Rp 500.000'},
+  ];
+
+  Map<String, dynamic>? selectedPaket;
+  late String selectedJatuhTempo;
+  bool isSaving = false;
+
+  final List<String> daftarJatuhTempo = ['Tanggal 5', 'Tanggal 10', 'Tanggal 15', 'Tanggal 20', 'Tanggal 25'];
+
+  @override
+  void initState() {
+    super.initState();
+    _namaController = TextEditingController(text: widget.pelangganData['nama']?.toString() ?? '');
+    _alamatController = TextEditingController(text: widget.pelangganData['alamat']?.toString() ?? '');
+    _hpController = TextEditingController(text: widget.pelangganData['no_hp']?.toString() ?? '');
+    _nikController = TextEditingController(text: widget.pelangganData['nik']?.toString() ?? '');
+    _salesController = TextEditingController(text: widget.pelangganData['sales']?.toString() ?? '');
+
+    selectedJatuhTempo = widget.pelangganData['jatuh_tempo']?.toString() ?? 'Tanggal 5';
+    if (!daftarJatuhTempo.contains(selectedJatuhTempo)) {
+      selectedJatuhTempo = 'Tanggal 5';
+    }
+
+    final currentPaketNama = widget.pelangganData['paket']?.toString();
+    try {
+      selectedPaket = daftarPaket.firstWhere((p) => p['nama'] == currentPaketNama);
+    } catch (_) {
+      selectedPaket = daftarPaket.first;
+    }
+  }
+
+  Future<void> updatePelanggan() async {
+    if (!_formKey.currentState!.validate() || selectedPaket == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lengkapi form dengan benar!')),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
+
+    final payload = {
+      "action": "update_pelanggan",
+      "idpel": widget.pelangganData['idpel']?.toString(),
+      "nama": _namaController.text,
+      "alamat": _alamatController.text,
+      "paket": selectedPaket!['nama'],
+      "harga": selectedPaket!['harga'],
+      "no_hp": _hpController.text,
+      "nik": _nikController.text,
+      "jatuh_tempo": selectedJatuhTempo,
+      "sales": _salesController.text,
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(scriptUrl),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        // Update data lokal
+        widget.pelangganData['nama'] = _namaController.text;
+        widget.pelangganData['alamat'] = _alamatController.text;
+        widget.pelangganData['paket'] = selectedPaket!['nama'];
+        widget.pelangganData['harga'] = selectedPaket!['harga'];
+        widget.pelangganData['no_hp'] = _hpController.text;
+        widget.pelangganData['nik'] = _nikController.text;
+        widget.pelangganData['jatuh_tempo'] = selectedJatuhTempo;
+        widget.pelangganData['sales'] = _salesController.text;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data pelanggan berhasil diperbarui!')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        throw Exception('Gagal memperbarui data ke server');
+      }
+    } catch (e) {
+      setState(() => isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Edit Data Pelanggan')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              TextFormField(
+                controller: _namaController,
+                decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _alamatController,
+                decoration: const InputDecoration(labelText: 'Alamat'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField>(
+                decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
+                value: selectedPaket,
+                items: daftarPaket.map((paket) {
+                  return DropdownMenuItem(
+                    value: paket,
+                    child: Text('${paket['nama']} (${paket['harga']})'),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    selectedPaket = val;
+                  });
+                },
+                validator: (val) => val == null ? 'Pilih paket' : null,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
+                value: selectedJatuhTempo,
+                items: daftarJatuhTempo.map((tgl) {
+                  return DropdownMenuItem(value: tgl, child: Text(tgl));
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    selectedJatuhTempo = val!;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _hpController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'No WhatsApp'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _nikController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'No KTP / NIK'),
+                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _salesController,
+                decoration: const InputDecoration(labelText: 'Nama Sales (Opsional)'),
+              ),
+              const SizedBox(height: 25),
+              ElevatedButton(
+                onPressed: isSaving ? null : updatePelanggan,
+                child: isSaving
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Simpan Perubahan'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
