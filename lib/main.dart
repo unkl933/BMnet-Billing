@@ -348,7 +348,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     );
   }
 
-  // Generate & Preview PDF Nota/Struk
   Future<void> _generateAndPrintPdf(bool isLunasState) async {
     final pdf = pw.Document();
 
@@ -432,6 +431,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TextField(
                       controller: bulanController,
@@ -462,10 +462,10 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    DropdownButtonFormField(
+                    DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Metode Pembayaran'),
                       value: selectedMetode,
-                      items: ['Tunai', 'QRIS', 'Transfer Bank'].map((metode) {
+                      items: ['Tunai', 'QRIS', 'Transfer Bank', 'DANA', 'GoPay', 'ShopeePay'].map((metode) {
                         return DropdownMenuItem(value: metode, child: Text(metode));
                       }).toList(),
                       onChanged: (val) {
@@ -474,6 +474,85 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                         });
                       },
                     ),
+                    const SizedBox(height: 15),
+
+                    // TAMPILAN INFORMASI REKENING / QRIS BERDASARKAN METODE YANG DIPILIH
+                    if (selectedMetode == 'QRIS') ...[
+                      const Center(
+                        child: Text(
+                          'Scan QRIS di bawah ini:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Container(
+                          height: 160,
+                          width: 160,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/images/qris.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Text(
+                                      'File QRIS tidak ditemukan di assets/images/qris.png',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.red, fontSize: 11),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else if (selectedMetode == 'Transfer Bank') ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Informasi Rekening Bank:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                            SizedBox(height: 5),
+                            Text('• Bank Asal: BCA'),
+                            Text('• No Rekening: 1234567890'),
+                            Text('• Atas Nama: PT BMnet Mandiri'),
+                          ],
+                        ),
+                      ),
+                    ] else if (selectedMetode == 'DANA' || selectedMetode == 'GoPay' || selectedMetode == 'ShopeePay') ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Informasi E-Wallet ($selectedMetode):', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                            const SizedBox(height: 5),
+                            Text('• Akun / No HP: 0812-3456-7890'),
+                            Text('• Atas Nama: BMnet Billing ($selectedMetode)'),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 10),
                     TextField(
                       controller: penerimaController,
