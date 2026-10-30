@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart02:json' show json;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -23,7 +23,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
   List filteredPelanggan = [];
   bool isLoading = true;
   String searchQuery = '';
-  String sortBy = 'default'; // 'default', 'nama', 'alamat', 'paket', 'lunas', 'belum_lunas'
+  String sortBy = 'default';
 
   @override
   void initState() {
@@ -53,7 +53,6 @@ class _BillingHomePageState extends State<BillingHomePage> {
   void _applyFilterAndSort() {
     List temp = List.from(pelanggan);
 
-    // 1. Filter berdasarkan pencarian nama
     if (searchQuery.isNotEmpty) {
       temp = temp.where((item) {
         final nama = (item['nama'] ?? '').toString().toLowerCase();
@@ -61,7 +60,6 @@ class _BillingHomePageState extends State<BillingHomePage> {
       }).toList();
     }
 
-    // 2. Sorting & Filter berdasarkan Status / Kategori
     if (sortBy == 'alamat') {
       temp.sort((a, b) => (a['alamat'] ?? '').toString().compareTo((b['alamat'] ?? '').toString()));
     } else if (sortBy == 'paket') {
@@ -238,6 +236,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Status berhasil diubah menjadi $statusBaru')),
         );
+        Navigator.pop(context, true); // Kembali & refresh halaman utama
       } else {
         throw Exception('Gagal memperbarui status');
       }
