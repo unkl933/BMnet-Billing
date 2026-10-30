@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
@@ -345,6 +348,66 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     );
   }
 
+  // Generate & Preview PDF Nota/Struk
+  Future<void> _generateAndPrintPdf(bool isLunasState) async {
+    final pdf = pw.Document();
+
+    final nama = widget.pelangganData['nama'] ?? '';
+    final idpel = widget.pelangganData['idpel'] ?? '';
+    final alamat = widget.pelangganData['alamat'] ?? '';
+    final paket = widget.pelangganData['paket'] ?? '';
+    final bulan = widget.pelangganData['jumlah_bulan_tunggakan'] ?? '1';
+    final total = widget.pelangganData['total_tunggakan'] ?? '0';
+    final status = widget.pelangganData['status'] ?? 'Belum Lunas';
+    final metode = widget.pelangganData['metode_pembayaran'] ?? '-';
+    final kasir = widget.pelangganData['diterima_oleh'] ?? '-';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a6,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Text('BMNET INTERNET BILLING', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.Center(
+                child: pw.Text(isLunasState ? 'BUKTI PEMBAYARAN RESMI' : 'NOTA / TAGIHAN INTERNET', style: const pw.TextStyle(fontSize: 12)),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(),
+              pw.Text('ID Pelanggan : $idpel'),
+              pw.Text('Nama         : $nama'),
+              pw.Text('Alamat       : $alamat'),
+              pw.Text('Paket        : $paket'),
+              pw.Text('Periode      : $bulan Bulan'),
+              pw.SizedBox(height: 5),
+              pw.Divider(),
+              pw.Text('Total Bayar  : Rp $total (Incl. PPN 11%)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Text('Metode Bayar : $metode'),
+              pw.Text('Kasir/Petugas: $kasir'),
+              pw.Text('Status       : $status', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 15),
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text('Terima kasih telah berlangganan bersama BMnet!', style: const pw.TextStyle(fontSize: 10)),
+              ),
+              pw.Center(
+                child: pw.Text('Layanan Pelanggan: 0812-xxxx-xxxx', style: const pw.TextStyle(fontSize: 8)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Nota_$idpel.pdf',
+    );
+  }
+
   void _showPaymentDialog() {
     String selectedMetode = 'Tunai';
     final TextEditingController penerimaController = TextEditingController();
@@ -543,16 +606,25 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                     onPressed: shareStrukWhatsApp,
                     icon: const Icon(Icons.share),
-                    label: const Text('Kirim Struk WA'),
+                    label: const Text('Kirim WA'),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 5),
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
                     onPressed: cetakStrukBluetooth,
                     icon: const Icon(Icons.print),
-                    label: const Text('Cetak Struk'),
+                    label: const Text('Cetak'),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                    onPressed: () => _generateAndPrintPdf(isLunas),
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('PDF'),
                   ),
                 ),
               ],
@@ -694,8 +766,8 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
 
     final payload = {
       "action": "update_pelanggan",
-      "old_idpel": widget.pelangganData['idpel']?.toString(), // ID lama untuk pencarian di spreadsheet
-      "idpel": _idpelController.text, // ID baru (bisa diubah)
+      "old_idpel": widget.pelangganData['idpel']?.toString(),
+      "idpel": _idpelController.text,
       "nama": _namaController.text,
       "alamat": _alamatController.text,
       "paket": selectedPaket!['nama'],
