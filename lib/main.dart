@@ -246,7 +246,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     }
   }
 
-  // Dialog Konfirmasi Pembayaran & Custom Tunggakan
   void _showPaymentDialog() {
     String selectedMetode = 'Tunai';
     final TextEditingController penerimaController = TextEditingController();
@@ -254,9 +253,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     final TextEditingController totalTunggakanController = TextEditingController();
     final TextEditingController bayarController = TextEditingController();
 
-    // Parse harga paket mentah menjadi angka untuk estimasi
-    String hargaStr = (widget.pelangganData['harga'] ?? '0').toString().replaceAll(RegInMapNumberFilter(), '');
-    // Regex pengganti sederhanakan ambil angka dari string harga (misal: "Rp 120.000" -> 120000)
     int hargaPaket = int.tryParse(widget.pelangganData['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
     
     totalTunggakanController.text = hargaPaket.toString();
@@ -449,7 +445,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
                     ),
                     onPressed: () {
                       if (isLunas) {
-                        // Reset jika ingin jadikan belum lunas lagi
                         updateStatusData({
                           "action": "update_status",
                           "idpel": widget.pelangganData['idpel']?.toString(),
@@ -791,17 +786,17 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField(
+              DropdownButtonFormField>(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
                 items: daftarPaket.map((paket) {
-                  return DropdownMenuItem(
+                  return DropdownMenuItem>(
                     value: paket,
                     child: Text('${paket['nama']} (${paket['harga']})'),
                   );
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    selectedPaket = val as Map<String, dynamic>?;
+                    selectedPaket = val;
                   });
                 },
                 validator: (val) => val == null ? 'Pilih paket' : null,
@@ -811,7 +806,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
                 value: selectedJatuhTempo,
                 items: daftarJatuhTempo.map((tgl) {
-                  return DropdownMenuItem(value: tgl, child: Text(tgl));
+                  return DropdownMenuItem<String>(value: tgl, child: Text(tgl));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
@@ -824,7 +819,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 decoration: const InputDecoration(labelText: 'Status Pembayaran Awal'),
                 value: selectedStatus,
                 items: daftarStatus.map((st) {
-                  return DropdownMenuItem(value: st, child: Text(st));
+                  return DropdownMenuItem<String>(value: st, child: Text(st));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
@@ -865,6 +860,3 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
     );
   }
 }
-
-// Helper kecil untuk regEx pencarian angka
-RegExp RegInMapNumberFilter() => RegExp(r'[^0-9]');
