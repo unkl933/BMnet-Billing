@@ -18,6 +18,7 @@ void main() {
   ));
 }
 
+// ================= NAVIGASI UTAMA (4 TAB) =================
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -85,7 +86,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ================= HALAMAN PELANGGAN =================
+// ================= TAB 1: HALAMAN PELANGGAN =================
 class BillingHomePage extends StatelessWidget {
   final List pelanggan;
   final List stok;
@@ -108,7 +109,7 @@ class BillingHomePage extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
                     title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTeknisi: ${item['teknisi'] ?? '-'}'),
+                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTeknisi: ${item['teknisi'] ?? '-'}\nMaterial: ${item['material_terpakai'] ?? '-'}'),
                     isThreeLine: true,
                     trailing: Text(item['status'] ?? 'Belum Lunas', style: TextStyle(color: (item['status'] == 'Lunas') ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
                   ),
@@ -129,7 +130,7 @@ class BillingHomePage extends StatelessWidget {
   }
 }
 
-// ================= HALAMAN TAMBAH PELANGGAN + PEMAKAIAN MATERIAL & TEKNISI =================
+// ================= HALAMAN TAMBAH PELANGGAN & POTONG STOK =================
 class TambahPelangganPage extends StatefulWidget {
   final List stokList;
   const TambahPelangganPage({super.key, required this.stokList});
@@ -148,7 +149,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _salesController = TextEditingController();
   final TextEditingController _teknisiController = TextEditingController();
   
-  // Input pemakaian material
   final TextEditingController _dropcoreController = TextEditingController(text: '0');
   final TextEditingController _patchcoreController = TextEditingController(text: '0');
   
@@ -167,7 +167,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter stok yang kategorinya ONT untuk dipilih saat instalasi
     List ontList = widget.stokList.where((s) => (s['kategori'] ?? '').toString().toLowerCase().contains('ont')).toList();
 
     return Scaffold(
@@ -238,7 +237,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
                   int totalTunggakan = (hargaInt * 1.11).round();
 
-                  // Menyusun daftar material yang terpakai untuk mengurangi stok
                   List> materialPakai = [];
                   if (selectedOnt != null) {
                     materialPakai.add({"nama": selectedOnt, "qty": 1});
@@ -297,31 +295,381 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   }
 }
 
-// ================= HALAMAN LAINNYA =================
-class PengeluaranPage extends StatelessWidget {
+// ================= TAB 2: HALAMAN PENGELUARAN =================
+class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
   final Future<void> Function() onRefresh;
+
   const PengeluaranPage({super.key, required this.pengeluaran, required this.isLoading, required this.onRefresh});
+
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Pengeluaran')));
+  State<PengeluaranPage> createState() => _PengeluaranPageState();
 }
 
+class _PengeluaranPageState extends State<PengeluaranPage> {
+  void _showTambahPengeluaranDialog(BuildContext context) {
+    final TextEditingController keteranganController = TextEditingController();
+    final TextEditingController nominalController = TextEditingController();
+    final TextEditingController jumlahStokController = TextEditingController(text: '1');
+    final TextEditingController satuanStokController = TextEditingController(text: 'Pcs');
+    String selectedKategori = 'Operasional';
+
+    final List<String> kategoriList = [
+      'Belanja Aset',
+      'Operasional',
+      'Gaji Karyawan',
+      'Hutang',
+      'Donasi Sosial',
+      'Maintenance / Pemeliharaan'
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isBelanjaAset = selectedKategori == 'Belanja Aset';
+
+            return AlertDialog(
+              title: const Text('Tambah Pengeluaran'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Kategori'),
+                      value: selectedKategori,
+                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
+                      onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: keteranganController,
+                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama Perangkat / Barang Aset' : 'Keterangan'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: nominalController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Nominal (Rp)')),
+                    
+                    if (isBelanjaAset) ...[
+                      const SizedBox(height: 15),
+                      const Divider(),
+                      const Text('Otomatis Masuk ke Stok Barang:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Expanded(flex: 2, child: TextField(controller: jumlahStokController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Jumlah'))),
+                          const SizedBox(width: 10),
+                          Expanded(flex: 1, child: TextField(controller: satuanStokController, decoration: const InputDecoration(labelText: 'Satuan'))),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nominalController.text.isEmpty || keteranganController.text.isEmpty) return;
+                    final payload = {
+                      "action": "tambah_pengeluaran",
+                      "kategori": selectedKategori,
+                      "keterangan": keteranganController.text,
+                      "nominal": nominalController.text,
+                      "jumlah_stok": jumlahStokController.text,
+                      "satuan_stok": satuanStokController.text,
+                      "tanggal": DateTime.now().toString().split(' ')[0],
+                    };
+                    Navigator.pop(context);
+                    try {
+                      final response = await http.post(
+                        Uri.parse(scriptUrl),
+                        headers: {"Content-Type": "application/json"},
+                        body: json.encode(payload),
+                      );
+                      if (response.statusCode == 200 || response.statusCode == 302) {
+                        widget.onRefresh();
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  },
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Pengeluaran (${widget.pengeluaran.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
+      body: widget.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : widget.pengeluaran.isEmpty
+              ? const Center(child: Text('Belum ada data pengeluaran.'))
+              : ListView.builder(
+                  itemCount: widget.pengeluaran.length,
+                  itemBuilder: (context, index) {
+                    final item = widget.pengeluaran[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: ListTile(
+                        leading: const Icon(Icons.money_off, color: Colors.red),
+                        title: Text(item['keterangan'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTgl: ${item['tanggal'] ?? '-'}'),
+                        trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                      ),
+                    );
+                  },
+                ),
+      floatingActionButton: FloatingActionButton(onPressed: () => _showTambahPengeluaranDialog(context), child: const Icon(Icons.add)),
+    );
+  }
+}
+
+// ================= TAB 3: HALAMAN STOK BARANG =================
 class StokBarangPage extends StatelessWidget {
   final List stok;
   final bool isLoading;
   final Future<void> Function() onRefresh;
+
   const StokBarangPage({super.key, required this.stok, required this.isLoading, required this.onRefresh});
+
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Stok Barang')));
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Stok Barang Jaringan (${stok.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh)]),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : stok.isEmpty
+              ? const Center(child: Text('Belum ada stok barang.'))
+              : ListView.builder(
+                  itemCount: stok.length,
+                  itemBuilder: (context, index) {
+                    final item = stok[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: ListTile(
+                        leading: const Icon(Icons.router, color: Colors.indigo),
+                        title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
+                        trailing: Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
 }
 
-class DashboardKeuanganPage extends StatelessWidget {
+// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN =================
+class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
   final bool isLoading;
   final Future<void> Function() onRefresh;
+
   const DashboardKeuanganPage({super.key, required this.pelanggan, required this.pengeluaran, required this.isLoading, required this.onRefresh});
+
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Keuangan')));
+  State<DashboardKeuanganPage> createState() => _DashboardKeuanganPageState();
+}
+
+class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
+  String selectedPeriode = 'Bulanan';
+
+  int _parseNominal(dynamic val) {
+    if (val == null) return 0;
+    String str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
+    return int.tryParse(str) ?? 0;
+  }
+
+  Future<void> _cetakLaporanPdf() async {
+    final pdf = pw.Document();
+    int totalLunas = 0;
+    int totalTunggakan = 0;
+    int totalPengeluaran = 0;
+
+    Map<String, int> rekapKategoriPengeluaran = {};
+
+    for (var item in widget.pelanggan) {
+      final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
+      final total = _parseNominal(item['total_tunggakan']);
+      if (status == 'lunas') {
+        totalLunas += total;
+      } else {
+        totalTunggakan += total;
+      }
+    }
+
+    for (var item in widget.pengeluaran) {
+      final nominal = _parseNominal(item['nominal']);
+      final kategori = (item['kategori'] ?? 'Operasional').toString();
+      totalPengeluaran += nominal;
+      rekapKategoriPengeluaran[kategori] = (rekapKategoriPengeluaran[kategori] ?? 0) + nominal;
+    }
+
+    final int dppLunas = (totalLunas / 1.11).round();
+    final int ppnLunas = totalLunas - dppLunas;
+    final int labaBersih = totalLunas - totalPengeluaran;
+
+    final now = DateTime.now();
+    final tglCetak = "${now.day}/${now.month}/${now.year}";
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('BMnet ISP - LAPORAN KEUANGAN & LABA RUGI', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Text('Periode: $selectedPeriode (${now.year}) | Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 1.5, color: PdfColors.blue800),
+              pw.SizedBox(height: 10),
+
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.green300), color: PdfColors.green50),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('PPN 11%: Rp $ppnLunas', style: const pw.TextStyle(fontSize: 7)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 5),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red300), color: PdfColors.red50),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('TOTAL PENGELUARAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+                          pw.Text('Rp $totalPengeluaran', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 15),
+
+              pw.Text('REKAP PENGELUARAN PER KATEGORI', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 5),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Kategori Pengeluaran', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Nominal', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                  ...rekapKategoriPengeluaran.entries.map((e) => pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right)),
+                    ],
+                  )),
+                ],
+              ),
+              pw.SizedBox(height: 15),
+              pw.Text('LABA / RUGI BERSIH: Rp $labaBersih', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo)),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Laporan_Keuangan_Pengeluaran_BMnet.pdf',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    int totalPemasukanLunas = 0;
+    int totalPengeluaran = 0;
+    Map<String, int> rekapKategoriPengeluaran = {};
+
+    for (var item in widget.pelanggan) {
+      if ((item['status'] ?? '').toString().toLowerCase() == 'lunas') {
+        totalPemasukanLunas += _parseNominal(item['total_tunggakan']);
+      }
+    }
+
+    for (var item in widget.pengeluaran) {
+      final nominal = _parseNominal(item['nominal']);
+      final kategori = (item['kategori'] ?? 'Operasional').toString();
+      totalPengeluaran += nominal;
+      rekapKategoriPengeluaran[kategori] = (rekapKategoriPengeluaran[kategori] ?? 0) + nominal;
+    }
+
+    final int labaBersih = totalPemasukanLunas - totalPengeluaran;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard Keuangan'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
+      body: widget.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Periode Laporan:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ToggleButtons(
+                      isSelected: [selectedPeriode == 'Bulanan', selectedPeriode == 'Tahunan'],
+                      onPressed: (index) => setState(() => selectedPeriode = index == 0 ? 'Bulanan' : 'Tahunan'),
+                      borderRadius: BorderRadius.circular(8),
+                      constraints: const BoxConstraints(minHeight: 32, minWidth: 90),
+                      children: const [Text('Bulanan', style: TextStyle(fontSize: 12)), Text('Tahunan', style: TextStyle(fontSize: 12))],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  onPressed: _cetakLaporanPdf,
+                  icon: const Icon(Icons.print),
+                  label: Text('Cetak Laporan $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 15),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
+                        const SizedBox(height: 8),
+                        Text('Total Pengeluaran: Rp $totalPengeluaran', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red)),
+                        const Divider(),
+                        Text('Laba / Rugi Bersih: Rp $labaBersih', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? Colors.blue : Colors.orange)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }
