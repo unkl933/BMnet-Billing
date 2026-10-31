@@ -13,24 +13,23 @@ const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyF
 
 void main() {
   runApp(const MaterialApp(
-    home: BillingHomePage(),
+    home: MainNavigationScreen(),
     debugShowCheckedModeBanner: false,
   ));
 }
 
-class BillingHomePage extends StatefulWidget {
-  const BillingHomePage({super.key});
+// ================= NAVIGASI UTAMA (TAB BAR) =================
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
 
   @override
-  State<BillingHomePage> createState() => _BillingHomePageState();
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _BillingHomePageState extends State<BillingHomePage> {
-  List pelanggan = [];
-  List filteredPelanggan = [];
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _currentIndex = 0;
+  List pelangganData = [];
   bool isLoading = true;
-  String searchQuery = '';
-  String sortBy = 'default';
 
   @override
   void initState() {
@@ -44,21 +43,94 @@ class _BillingHomePageState extends State<BillingHomePage> {
       final response = await http.get(Uri.parse(scriptUrl));
       if (response.statusCode == 200 || response.statusCode == 302) {
         setState(() {
-          pelanggan = json.decode(response.body);
-          _applyFilterAndSort();
+          pelangganData = json.decode(response.body);
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil data: $e')),
+        SnackBar(content: Text('Gagal mengambil data dari server: $e')),
       );
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      BillingHomePage(
+        pelanggan: pelangganData,
+        isLoading: isLoading,
+        onRefresh: fetchPelanggan,
+      ),
+      DashboardKeuanganPage(
+        pelanggan: pelangganData,
+        isLoading: isLoading,
+        onRefresh: fetchPelanggan,
+      ),
+    ];
+
+    return Scaffold(
+      body: pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        selectedItemColor: Colors.blueAccent,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Pelanggan',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_customize),
+            label: 'Dashboard Keuangan',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ================= HALAMAN DAFTAR PELANGGAN =================
+class BillingHomePage extends StatefulWidget {
+  final List pelanggan;
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
+
+  const BillingHomePage({
+    super.key,
+    required this.pelanggan,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  @override
+  State<BillingHomePage> createState() => _BillingHomePageState();
+}
+
+class _BillingHomePageState extends State<BillingHomePage> {
+  List filteredPelanggan = [];
+  String searchQuery = '';
+  String sortBy = 'default';
+
+  @override
+  void initState() {
+    super.initState();
+    _applyFilterAndSort();
+  }
+
+  @override
+  void didUpdateWidget(covariant BillingHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _applyFilterAndSort();
+  }
+
   void _applyFilterAndSort() {
-    List temp = List.from(pelanggan);
+    List temp = List.from(widget.pelanggan);
 
     if (searchQuery.isNotEmpty) {
       temp = temp.where((item) {
@@ -109,11 +181,11 @@ class _BillingHomePageState extends State<BillingHomePage> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: fetchPelanggan,
+            onPressed: widget.onRefresh,
           )
         ],
       ),
-      body: isLoading
+      body: widget.isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -179,7 +251,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
                                     ),
                                   );
                                   if (result == true) {
-                                    fetchPelanggan();
+                                    widget.onRefresh();
                                   }
                                 },
                               ),
@@ -197,7 +269,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
             MaterialPageRoute(builder: (context) => const TambahPelangganPage()),
           );
           if (result == true) {
-            fetchPelanggan();
+            widget.onRefresh();
           }
         },
       ),
@@ -205,7 +277,246 @@ class _BillingHomePageState extends State<BillingHomePage> {
   }
 }
 
-// ================= Halaman Detail Pelanggan =================
+// ================= DASHBOARD KEUANGAN & LAPORAN =================
+class DashboardKeuanganPage extends StatelessWidget {
+  final List pelanggan;
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
+
+  const DashboardKeuanganPage({
+    super.key,
+    required this.pelanggan,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  int _parseNominal(dynamic val) {
+    if (val == null) return 0;
+    String str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
+    return int.tryParse(str) ?? 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    int totalPemasukanLunas = 0;
+    int totalTunggakan = 0;
+    int totalPelangganLunas = 0;
+    int totalPelangganBelumLunas = 0;
+
+    Map<String, int> rekapKasir = {};
+    Map<String, int> rekapMetode = {};
+
+    for (var item in pelanggan) {
+      final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
+      final total = _parseNominal(item['total_tunggakan']);
+      final metode = (item['metode_pembayaran'] ?? '-').toString();
+      final kasir = (item['diterima_oleh'] ?? '-').toString();
+
+      if (status == 'lunas') {
+        totalPemasukanLunas += total;
+        totalPelangganLunas++;
+
+        // Rekap Kasir
+        if (kasir != '-' && kasir.isNotEmpty) {
+          rekapKasir[kasir] = (rekapKasir[kasir] ?? 0) + total;
+        }
+        // Rekap Metode Bayar
+        if (metode != '-' && metode.isNotEmpty) {
+          rekapMetode[metode] = (rekapMetode[metode] ?? 0) + total;
+        }
+      } else {
+        totalTunggakan += total;
+        totalPelangganBelumLunas++;
+      }
+    }
+
+    final totalSemuaPelanggan = pelanggan.length;
+    final rasioLunas = totalSemuaPelanggan > 0 ? (totalPelangganLunas / totalSemuaPelanggan) : 0.0;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard Keuangan & Laporan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: onRefresh,
+          ),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  // RINGKASAN INTEGRATED KPI CARDS
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildKpiCard(
+                          'Pemasukan (Lunas)',
+                          'Rp $totalPemasukanLunas',
+                          Colors.green.shade700,
+                          Icons.account_balance_wallet,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildKpiCard(
+                          'Tunggakan (Belum)',
+                          'Rp $totalTunggakan',
+                          Colors.red.shade700,
+                          Icons.pending_actions,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  // PROGRESS BAR PELUNASAN
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Status Pelunasan Bulan Ini', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text('${(rasioLunas * 100).toStringAsFixed(1)}% Lunas', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          LinearProgressIndicator(
+                            value: rasioLunas,
+                            backgroundColor: Colors.red.shade100,
+                            color: Colors.green,
+                            minHeight: 10,
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Lunas: $totalPelangganLunas Pelanggan', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
+                              Text('Belum: $totalPelangganBelumLunas Pelanggan', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // REKAP METODE PEMBAYARAN
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Rekap Berdasarkan Metode Pembayaran', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Divider(),
+                          rekapMetode.isEmpty
+                              ? const Text('Belum ada data pembayaran lunas.')
+                              : Column(
+                                  children: rekapMetode.entries.map((e) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(e.key, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                          Text('Rp ${e.value}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // REKAP KASIR / PETUGAS PENERIMA
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Rekap Kas Masuk per Petugas / Kasir', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Divider(),
+                          rekapKasir.isEmpty
+                              ? const Text('Belum ada transaksi yang dicatat petugas.')
+                              : Column(
+                                  children: rekapKasir.entries.map((e) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.person, size: 18, color: Colors.grey),
+                                              const SizedBox(width: 5),
+                                              Text(e.key, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                            ],
+                                          ),
+                                          Text('Rp ${e.value}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildKpiCard(String title, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+              Icon(icon, color: color, size: 20),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ================= HALAMAN DETAIL PELANGGAN =================
 class DetailPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
 
@@ -253,7 +564,6 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
     }
   }
 
-  // FUNGSI MEMBUAT FILE PDF (SESUAI FORMAT NOTA PENAGIHAN DAN KWITANSI LUNAS)
   Future<pw.Document> _buildPdfDocument(bool isLunas) async {
     final pdf = pw.Document();
 
@@ -971,7 +1281,7 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
   }
 }
 
-// ================= Halaman Edit Pelanggan =================
+// ================= HALAMAN EDIT PELANGGAN =================
 class EditPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
 
@@ -1194,7 +1504,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   }
 }
 
-// ================= Halaman Tambah Pelanggan =================
+// ================= HALAMAN TAMBAH PELANGGAN =================
 class TambahPelangganPage extends StatefulWidget {
   const TambahPelangganPage({super.key});
 
