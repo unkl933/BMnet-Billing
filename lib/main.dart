@@ -87,7 +87,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_customize),
-            label: 'Dashboard Keuangan',
+            label: 'Dashboard & Laporan',
           ),
         ],
       ),
@@ -277,7 +277,7 @@ class _BillingHomePageState extends State<BillingHomePage> {
   }
 }
 
-// ================= DASHBOARD KEUANGAN & LAPORAN =================
+// ================= DASHBOARD KEUANGAN & CETAK LAPORAN =================
 class DashboardKeuanganPage extends StatelessWidget {
   final List pelanggan;
   final bool isLoading;
@@ -294,6 +294,163 @@ class DashboardKeuanganPage extends StatelessWidget {
     if (val == null) return 0;
     String str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
     return int.tryParse(str) ?? 0;
+  }
+
+  // FUNGSI MEMBUAT DOKUMEN PDF LAPORAN KEUANGAN
+  Future<void> _cetakLaporanPdf(BuildContext context) async {
+    final pdf = pw.Document();
+    int totalLunas = 0;
+    int totalTunggakan = 0;
+    int jmlLunas = 0;
+    int jmlBelum = 0;
+
+    Map<String, int> rekapKasir = {};
+    Map<String, int> rekapMetode = {};
+
+    for (var item in pelanggan) {
+      final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
+      final total = _parseNominal(item['total_tunggakan']);
+      final metode = (item['metode_pembayaran'] ?? '-').toString();
+      final kasir = (item['diterima_oleh'] ?? '-').toString();
+
+      if (status == 'lunas') {
+        totalLunas += total;
+        jmlLunas++;
+        if (kasir != '-' && kasir.isNotEmpty) rekapKasir[kasir] = (rekapKasir[kasir] ?? 0) + total;
+        if (metode != '-' && metode.isNotEmpty) rekapMetode[metode] = (rekapMetode[metode] ?? 0) + total;
+      } else {
+        totalTunggakan += total;
+        jmlBelum++;
+      }
+    }
+
+    final now = DateTime.now();
+    final tglCetak = "${now.day}/${now.month}/${now.year}";
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // HEADER LAPORAN
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('BMnet ISP - LAPORAN KEUANGAN', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.Text('Rekapitulasi Pendapatan & Status Tagihan Bulanan', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('Tanggal Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 1.5, color: PdfColors.blue800),
+              pw.SizedBox(height: 15),
+
+              // RINGKASAN KOTAK KPI
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.green300), color: PdfColors.green50, borderRadius: pw.BorderRadius.circular(4)),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('TOTAL PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                          pw.SizedBox(height: 5),
+                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
+                          pw.Text('$jmlLunas Pelanggan Lunas', style: const pw.TextStyle(fontSize: 8)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red300), color: PdfColors.red50, borderRadius: pw.BorderRadius.circular(4)),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('TOTAL TUNGGAKAN (BELUM)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+                          pw.SizedBox(height: 5),
+                          pw.Text('Rp $totalTunggakan', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
+                          pw.Text('$jmlBelum Pelanggan Belum Lunas', style: const pw.TextStyle(fontSize: 8)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+
+              // REKAP METODE PEMBAYARAN
+              pw.Text('REKAP METODE PEMBAYARAN', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 5),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Metode Pembayaran', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Nominal', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                  ...rekapMetode.entries.map((e) => pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                    ],
+                  )),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+
+              // REKAP KASIR / PETUGAS
+              pw.Text('REKAP PENERIMAAN KASIR / PETUGAS', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 5),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Nama Petugas / Kasir', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Diterima', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                  ...rekapKasir.entries.map((e) => pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                    ],
+                  )),
+                ],
+              ),
+
+              pw.Spacer(),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Center(
+                child: pw.Text('BMnet Billing System - Laporan Keuangan Otomatis', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Laporan_Keuangan_BMnet.pdf',
+    );
   }
 
   @override
@@ -315,15 +472,8 @@ class DashboardKeuanganPage extends StatelessWidget {
       if (status == 'lunas') {
         totalPemasukanLunas += total;
         totalPelangganLunas++;
-
-        // Rekap Kasir
-        if (kasir != '-' && kasir.isNotEmpty) {
-          rekapKasir[kasir] = (rekapKasir[kasir] ?? 0) + total;
-        }
-        // Rekap Metode Bayar
-        if (metode != '-' && metode.isNotEmpty) {
-          rekapMetode[metode] = (rekapMetode[metode] ?? 0) + total;
-        }
+        if (kasir != '-' && kasir.isNotEmpty) rekapKasir[kasir] = (rekapKasir[kasir] ?? 0) + total;
+        if (metode != '-' && metode.isNotEmpty) rekapMetode[metode] = (rekapMetode[metode] ?? 0) + total;
       } else {
         totalTunggakan += total;
         totalPelangganBelumLunas++;
@@ -350,7 +500,20 @@ class DashboardKeuanganPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
-                  // RINGKASAN INTEGRATED KPI CARDS
+                  // TOMBOL CETAK LAPORAN PDF
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => _cetakLaporanPdf(context),
+                    icon: const Icon(Icons.print),
+                    label: const Text('Cetak / Unduh Laporan Keuangan (PDF)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // RINGKASAN KPI CARDS
                   Row(
                     children: [
                       Expanded(
@@ -444,7 +607,7 @@ class DashboardKeuanganPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 15),
 
-                  // REKAP KASIR / PETUGAS PENERIMA
+                  // REKAP KASIR
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
