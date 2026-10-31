@@ -111,6 +111,7 @@ class BillingHomePage extends StatelessWidget {
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Material     : ${item['material_terpakai'] ?? '-'}'),
+              Text('Bulan Tagih  : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
               const Divider(),
               Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: (item['status'] == 'Lunas') ? Colors.green : Colors.red)),
               Text('Total Tagihan: Rp ${item['total_tunggakan'] ?? '0'}'),
@@ -135,7 +136,7 @@ class BillingHomePage extends StatelessWidget {
               _showEditPelangganDialog(context, item);
             },
             icon: const Icon(Icons.edit, size: 16),
-            label: const Text('Edit'),
+            label: const Text('Edit Full'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -148,7 +149,7 @@ class BillingHomePage extends StatelessWidget {
 
   void _showBayarDialog(BuildContext context, Map item) {
     String selectedMetode = 'Tunai';
-    final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS'];
+    final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS', 'DANA', 'GoPay', 'ShopeePay', 'OVO'];
 
     showDialog(
       context: context,
@@ -156,20 +157,52 @@ class BillingHomePage extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Pelunasan Tagihan: ${item['nama']}'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Total Tunggakan: Rp ${item['total_tunggakan']}'),
-                  const SizedBox(height: 15),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
-                    value: selectedMetode,
-                    items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                    onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
-                  ),
-                ],
+              title: Text('Pelunasan: ${item['nama']}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total Tagihan (${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan): Rp ${item['total_tunggakan']}'),
+                    const SizedBox(height: 15),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
+                      value: selectedMetode,
+                      items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
+                    ),
+                    const SizedBox(height: 15),
+                    if (selectedMetode == 'Transfer Bank') ...[
+                      const ContainerInfoBayar(
+                        judul: 'Informasi Transfer Bank BCA',
+                        detail: 'Nama Bank : BCA\nNo Rek : 2801971611\nAtas Nama : Irsyam Aufar Zuhdan',
+                      ),
+                    ] else if (['DANA', 'GoPay', 'ShopeePay', 'OVO'].contains(selectedMetode)) ...[
+                      ContainerInfoBayar(
+                        judul: 'Informasi E-Wallet ($selectedMetode)',
+                        detail: 'Layanan : $selectedMetode\nNo Tujuan : 083827777207\nAtas Nama : Irsyam Aufar Zuhdan',
+                      ),
+                    ] else if (selectedMetode == 'QRIS') ...[
+                      const SizedBox(height: 10),
+                      const Text('Scan QRIS di bawah ini:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Image.asset(
+                          'assets/images/qris.png',
+                          height: 180,
+                          width: 180,
+                          errorBuilder: (context, error, stackTrace) => const Text(
+                            'Gambar QRIS tidak ditemukan di assets/images/qris.png',
+                            style: TextStyle(color: Colors.red, fontSize: 10),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Atas Nama: Irsyam Aufar Zuhdan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    ],
+                  ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
@@ -181,6 +214,7 @@ class BillingHomePage extends StatelessWidget {
                       "action": "bayar_pelanggan",
                       "idpel": item['idpel'],
                       "metode_pembayaran": selectedMetode,
+                      "total_tunggakan": item['total_tunggakan'],
                       "status": "Lunas"
                     };
                     try {
@@ -193,7 +227,7 @@ class BillingHomePage extends StatelessWidget {
                         onRefresh();
                       }
                     } catch (e) {
-                      // handle catch
+                      // ignore
                     }
                   },
                   child: const Text('Konfirmasi Lunas'),
@@ -211,52 +245,78 @@ class BillingHomePage extends StatelessWidget {
     final TextEditingController alamatController = TextEditingController(text: item['alamat']);
     final TextEditingController hpController = TextEditingController(text: item['no_hp']);
     final TextEditingController teknisiController = TextEditingController(text: item['teknisi']);
+    final TextEditingController bulanController = TextEditingController(text: item['jumlah_bulan_tunggakan']?.toString() ?? '1');
+    
+    String selectedStatus = item['status'] ?? 'Belum Lunas';
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Edit Data: ${item['nama']}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
-                TextField(controller: alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
-                TextField(controller: hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
-                TextField(controller: teknisiController, decoration: const InputDecoration(labelText: 'Teknisi')),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Edit Full: ${item['nama']}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
+                    TextField(controller: alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
+                    TextField(controller: hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
+                    TextField(controller: teknisiController, decoration: const InputDecoration(labelText: 'Teknisi')),
+                    TextField(
+                      controller: bulanController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan/Tunggakan'),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Status Pembayaran'),
+                      value: selectedStatus,
+                      items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                      onChanged: (val) => setDialogState(() => selectedStatus = val.toString()),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+                ElevatedButton(
+                  onPressed: () async {
+                    int hargaSatuan = int.tryParse((item['harga'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+                    int jmlBulan = int.tryParse(bulanController.text) ?? 1;
+                    int totalTagihanBaru = (hargaSatuan * jmlBulan * 1.11).round();
+
+                    Navigator.pop(context);
+                    final payload = {
+                      "action": "edit_pelanggan_full",
+                      "idpel": item['idpel'],
+                      "nama": namaController.text,
+                      "alamat": alamatController.text,
+                      "no_hp": hpController.text,
+                      "teknisi": teknisiController.text,
+                      "jumlah_bulan_tunggakan": jmlBulan.toString(),
+                      "total_tunggakan": totalTagihanBaru.toString(),
+                      "status": selectedStatus,
+                    };
+                    try {
+                      final response = await http.post(
+                        Uri.parse(scriptUrl),
+                        headers: {"Content-Type": "application/json"},
+                        body: json.encode(payload),
+                      );
+                      if (response.statusCode == 200 || response.statusCode == 302) {
+                        onRefresh();
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  },
+                  child: const Text('Simpan Perubahan'),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                final payload = {
-                  "action": "edit_pelanggan",
-                  "idpel": item['idpel'],
-                  "nama": namaController.text,
-                  "alamat": alamatController.text,
-                  "no_hp": hpController.text,
-                  "teknisi": teknisiController.text,
-                };
-                try {
-                  final response = await http.post(
-                    Uri.parse(scriptUrl),
-                    headers: {"Content-Type": "application/json"},
-                    body: json.encode(payload),
-                  );
-                  if (response.statusCode == 200 || response.statusCode == 302) {
-                    onRefresh();
-                  }
-                } catch (e) {
-                  // handle error
-                }
-              },
-              child: const Text('Simpan Perubahan'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -277,7 +337,7 @@ class BillingHomePage extends StatelessWidget {
                   child: ListTile(
                     onTap: () => _showPelangganDetailDialog(context, item),
                     title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTeknisi: ${item['teknisi'] ?? '-'}\nMaterial: ${item['material_terpakai'] ?? '-'}'),
+                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTagihan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bln (Rp ${item['total_tunggakan'] ?? '0'})\nStatus: ${item['status'] ?? 'Belum Lunas'}'),
                     isThreeLine: true,
                     trailing: Text(item['status'] ?? 'Belum Lunas', style: TextStyle(color: (item['status'] == 'Lunas') ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
                   ),
@@ -293,6 +353,28 @@ class BillingHomePage extends StatelessWidget {
           );
           if (result == true) onRefresh();
         },
+      ),
+    );
+  }
+}
+
+class ContainerInfoBayar extends StatelessWidget {
+  final String judul;
+  final String detail;
+  const ContainerInfoBayar({super.key, required this.judul, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: Colors.blue.shade50, border: Border.all(color: Colors.blue.shade200), borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(judul, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
+          const SizedBox(height: 5),
+          Text(detail, style: const TextStyle(fontSize: 12)),
+        ],
       ),
     );
   }
