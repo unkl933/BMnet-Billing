@@ -111,6 +111,8 @@ class BillingHomePage extends StatelessWidget {
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Material     : ${item['material_terpakai'] ?? '-'}'),
+              Text('SN ONT       : ${item['sn_ont'] ?? '-'}'),
+              Text('Gangguan     : ${item['jenis_gangguan'] ?? '-'}'),
               Text('Bulan Tagih  : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
               const Divider(),
               Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: (item['status'] == 'Lunas') ? Colors.green : Colors.red)),
@@ -133,10 +135,14 @@ class BillingHomePage extends StatelessWidget {
           TextButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              _showEditPelangganDialog(context, item);
+              // Membuka menu Upgrade & Penanganan Gangguan
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => UpgradePelangganPage(pelangganItem: item, stokList: stok)),
+              ).then((res) => { if (res == true) onRefresh() });
             },
-            icon: const Icon(Icons.edit, size: 16),
-            label: const Text('Edit Full'),
+            icon: const Icon(Icons.upgrade, size: 16),
+            label: const Text('Upgrade & Perbaikan'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -240,88 +246,6 @@ class BillingHomePage extends StatelessWidget {
     );
   }
 
-  void _showEditPelangganDialog(BuildContext context, Map item) {
-    final TextEditingController namaController = TextEditingController(text: item['nama']);
-    final TextEditingController alamatController = TextEditingController(text: item['alamat']);
-    final TextEditingController hpController = TextEditingController(text: item['no_hp']);
-    final TextEditingController teknisiController = TextEditingController(text: item['teknisi']);
-    final TextEditingController bulanController = TextEditingController(text: item['jumlah_bulan_tunggakan']?.toString() ?? '1');
-    
-    String selectedStatus = item['status'] ?? 'Belum Lunas';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('Edit Full: ${item['nama']}'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
-                    TextField(controller: alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
-                    TextField(controller: hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
-                    TextField(controller: teknisiController, decoration: const InputDecoration(labelText: 'Teknisi')),
-                    TextField(
-                      controller: bulanController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan/Tunggakan'),
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'Status Pembayaran'),
-                      value: selectedStatus,
-                      items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                      onChanged: (val) => setDialogState(() => selectedStatus = val.toString()),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-                ElevatedButton(
-                  onPressed: () async {
-                    int hargaSatuan = int.tryParse((item['harga'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
-                    int jmlBulan = int.tryParse(bulanController.text) ?? 1;
-                    int totalTagihanBaru = (hargaSatuan * jmlBulan * 1.11).round();
-
-                    Navigator.pop(context);
-                    final payload = {
-                      "action": "edit_pelanggan_full",
-                      "idpel": item['idpel'],
-                      "nama": namaController.text,
-                      "alamat": alamatController.text,
-                      "no_hp": hpController.text,
-                      "teknisi": teknisiController.text,
-                      "jumlah_bulan_tunggakan": jmlBulan.toString(),
-                      "total_tunggakan": totalTagihanBaru.toString(),
-                      "status": selectedStatus,
-                    };
-                    try {
-                      final response = await http.post(
-                        Uri.parse(scriptUrl),
-                        headers: {"Content-Type": "application/json"},
-                        body: json.encode(payload),
-                      );
-                      if (response.statusCode == 200 || response.statusCode == 302) {
-                        onRefresh();
-                      }
-                    } catch (e) {
-                      // ignore
-                    }
-                  },
-                  child: const Text('Simpan Perubahan'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -380,30 +304,28 @@ class ContainerInfoBayar extends StatelessWidget {
   }
 }
 
-// ================= HALAMAN TAMBAH PELANGGAN & POTONG STOK =================
-class TambahPelangganPage extends StatefulWidget {
+// ================= HALAMAN UPGRADE DATA & PENANGANAN GANGGUAN =================
+class UpgradePelangganPage extends StatefulWidget {
+  final Map pelangganItem;
   final List stokList;
-  const TambahPelangganPage({super.key, required this.stokList});
+  const UpgradePelangganPage({super.key, required this.pelangganItem, required this.stokList});
 
   @override
-  State<TambahPelangganPage> createState() => _TambahPelangganPageState();
+  State<UpgradePelangganPage> createState() => _UpgradePelangganPageState();
 }
 
-class _TambahPelangganPageState extends State<TambahPelangganPage> {
+class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _idpelController = TextEditingController();
-  final TextEditingController _namaController = TextEditingController();
-  final TextEditingController _alamatController = TextEditingController();
-  final TextEditingController _hpController = TextEditingController();
-  final TextEditingController _nikController = TextEditingController();
-  final TextEditingController _salesController = TextEditingController();
-  final TextEditingController _teknisiController = TextEditingController();
-  
-  final TextEditingController _dropcoreController = TextEditingController(text: '0');
-  final TextEditingController _patchcoreController = TextEditingController(text: '0');
-  
-  String? selectedOnt;
-  String selectedJatuhTempo = 'Tanggal 5';
+  late TextEditingController _namaController;
+  late TextEditingController _alamatController;
+  late TextEditingController _hpController;
+  late TextEditingController _bulanController;
+  late TextEditingController _snOntController;
+  late TextEditingController _gangguanController;
+  late TextEditingController _teknisiController;
+
+  String selectedStatus = 'Belum Lunas';
+  String? selectedOntBaru;
   bool isSaving = false;
 
   var daftarPaket = [
@@ -413,111 +335,124 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
     {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
   ];
 
-  Map<String, dynamic>? selectedPaket;
+  Map<String, dynamic>? selectedPaketBaru;
+
+  @override
+  void initState() {
+    super.initState();
+    _namaController = TextEditingController(text: widget.pelangganItem['nama']);
+    _alamatController = TextEditingController(text: widget.pelangganItem['alamat']);
+    _hpController = TextEditingController(text: widget.pelangganItem['no_hp']);
+    _bulanController = TextEditingController(text: widget.pelangganItem['jumlah_bulan_tunggakan']?.toString() ?? '1');
+    _snOntController = TextEditingController(text: widget.pelangganItem['sn_ont'] ?? '');
+    _gangguanController = TextEditingController(text: widget.pelangganItem['jenis_gangguan'] ?? '');
+    _teknisiController = TextEditingController(text: widget.pelangganItem['teknisi'] ?? '');
+    selectedStatus = widget.pelangganItem['status'] ?? 'Belum Lunas';
+    
+    // Set default paket saat ini
+    var currentPaketName = widget.pelangganItem['paket'];
+    for (var p in daftarPaket) {
+      if (p['nama'] == currentPaketName) {
+        selectedPaketBaru = p;
+        break;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     List ontList = widget.stokList.where((s) => (s['kategori'] ?? '').toString().toLowerCase().contains('ont')).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tambah Pelanggan & Pasang Baru')),
+      appBar: AppBar(title: Text('Upgrade & Perbaikan: ${widget.pelangganItem['nama']}')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              const Text('Data Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
+              const Text('Informasi & Ganti Paket', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 15)),
               const Divider(),
-              TextFormField(controller: _idpelController, decoration: const InputDecoration(labelText: 'ID Pelanggan (Opsional / Otomatis)')),
-              TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Lengkap'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
-              TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat Pemasangan'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
-              TextFormField(controller: _hpController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'No WhatsApp')),
+              TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
+              TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
+              TextFormField(controller: _hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
               
               const SizedBox(height: 15),
-              DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
+              DropdownButtonFormField>(
+                decoration: const InputDecoration(labelText: 'Ganti Paket Internet (Upgrade/Downgrade)'),
+                value: selectedPaketBaru,
                 items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
-                onChanged: (val) => setState(() => selectedPaket = val as Map<String, dynamic>?),
+                onChanged: (val) => setState(() => selectedPaketBaru = val),
               ),
 
-              const SizedBox(height: 20),
-              const Text('Instalasi & Teknisi Lapangan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
-              const Divider(),
-              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi yang Bertugas (Cth: Budi / Joko)')),
-              
-              const SizedBox(height: 10),
+              TextFormField(
+                controller: _bulanController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan'),
+              ),
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Pilih Perangkat ONT yang Dipasang'),
-                value: selectedOnt,
+                decoration: const InputDecoration(labelText: 'Status Tagihan'),
+                value: selectedStatus,
+                items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (val) => setState(() => selectedStatus = val.toString()),
+              ),
+
+              const SizedBox(height: 25),
+              const Text('Penanganan Gangguan & Perangkat', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orangeAccent, fontSize: 15)),
+              const Divider(),
+              
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Penggantian ONT Baru (Opsional jika rusak)'),
+                value: selectedOntBaru,
                 items: ontList.isEmpty 
                     ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
                     : ontList.map((o) => DropdownMenuItem<String>(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
-                onChanged: (val) => setState(() => selectedOnt = val),
+                onChanged: (val) => setState(() => selectedOntBaru = val),
               ),
 
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _dropcoreController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Kabel Dropcore (Meter)'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _patchcoreController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Patchcore (Pcs)'),
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: _snOntController,
+                decoration: const InputDecoration(labelText: 'Serial Number (SN) ONT'),
+              ),
+              TextFormField(
+                controller: _gangguanController,
+                decoration: const InputDecoration(labelText: 'Jenis Gangguan yang Diperbaiki (Cth: Redaman Tinggi / Mati Total)'),
+              ),
+              TextFormField(
+                controller: _teknisiController,
+                decoration: const InputDecoration(labelText: 'Nama Teknisi yang Memperbaiki'),
               ),
 
               const SizedBox(height: 30),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: Colors.indigo, foregroundColor: Colors.white),
                 onPressed: isSaving ? null : () async {
-                  if (!_formKey.currentState!.validate() || selectedPaket == null) return;
+                  if (!_formKey.currentState!.validate() || selectedPaketBaru == null) return;
                   setState(() => isSaving = true);
 
-                  int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
-                  int totalTunggakan = (hargaInt * 1.11).round();
+                  int hargaInt = int.tryParse(selectedPaketBaru!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+                  int jmlBulan = int.tryParse(_bulanController.text) ?? 1;
+                  int totalTagihanBaru = (hargaInt * jmlBulan * 1.11).round();
 
                   List materialPakai = [];
-                  if (selectedOnt != null) {
-                    materialPakai.add({"nama": selectedOnt, "qty": 1});
+                  if (selectedOntBaru != null) {
+                    materialPakai.add({"nama": selectedOntBaru, "qty": 1});
                   }
-                  double dropcoreVal = double.tryParse(_dropcoreController.text) ?? 0;
-                  if (dropcoreVal > 0) {
-                    materialPakai.add({"nama": "Kabel FO Dropcore", "qty": dropcoreVal});
-                  }
-                  int patchcoreVal = int.tryParse(_patchcoreController.text) ?? 0;
-                  if (patchcoreVal > 0) {
-                    materialPakai.add({"nama": "Patchcord / Pigtail", "qty": patchcoreVal});
-                  }
-
-                  String materialStr = "ONT: ${selectedOnt ?? '-'}, Dropcore: ${_dropcoreController.text}m, Patchcore: ${_patchcoreController.text}pcs";
 
                   final payload = {
-                    "idpel": _idpelController.text,
+                    "action": "upgrade_dan_perbaikan",
+                    "idpel": widget.pelangganItem['idpel'],
                     "nama": _namaController.text,
                     "alamat": _alamatController.text,
-                    "paket": selectedPaket!['nama'],
-                    "harga": selectedPaket!['harga'],
                     "no_hp": _hpController.text,
-                    "nik": _nikController.text,
-                    "jatuh_tempo": selectedJatuhTempo,
-                    "status": "Belum Lunas",
-                    "sales": _salesController.text,
-                    "teknisi": _teknisiController.text.isEmpty ? "Tim Teknisi" : _teknisiController.text,
-                    "material_terpakai": materialStr,
-                    "jumlah_bulan_tunggakan": "1",
-                    "total_tunggakan": totalTunggakan.toString(),
-                    "sisa_tunggakan": totalTunggakan.toString(),
+                    "paket": selectedPaketBaru!['nama'],
+                    "harga": selectedPaketBaru!['harga'],
+                    "jumlah_bulan_tunggakan": jmlBulan.toString(),
+                    "total_tunggakan": totalTagihanBaru.toString(),
+                    "status": selectedStatus,
+                    "sn_ont": _snOntController.text,
+                    "jenis_gangguan": _gangguanController.text,
+                    "teknisi": _teknisiController.text,
                     "pemakaian_material": materialPakai,
                   };
 
@@ -535,7 +470,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   }
                 },
                 icon: const Icon(Icons.save),
-                label: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Simpan Pelanggan & Potong Stok', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Simpan Upgrade & Perbaikan', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
