@@ -94,14 +94,12 @@ class BillingHomePage extends StatelessWidget {
 
   const BillingHomePage({super.key, required this.pelanggan, required this.stok, required this.isLoading, required this.onRefresh});
 
-  // Fungsi Generate & Share PDF Nota / Kwitansi Profesional
   Future<void> _sharePdfNotaWa(Map item, bool isLunas) async {
     final pdf = pw.Document();
     final now = DateTime.now();
     final tanggalCetak = "${now.day}/${now.month}/${now.year}";
     final noRef = isLunas ? "KW/BM/${now.year}/${now.month}/${item['idpel'] ?? '891'}" : "INV/BM/${now.year}/${now.month}/${item['idpel'] ?? '042'}";
 
-    // Hitung rincian harga & PPN 11%
     int totalNominal = int.tryParse((item['total_tunggakan'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
     int dpp = (totalNominal / 1.11).round();
     int ppn = totalNominal - dpp;
@@ -114,13 +112,11 @@ class BillingHomePage extends StatelessWidget {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Header Perusahaan (Nama: BM Network Warna Biru & Logo)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Row(
                     children: [
-                      // Logo Placeholder / Kotak Identitas
                       pw.Container(
                         width: 35,
                         height: 35,
@@ -154,8 +150,6 @@ class BillingHomePage extends StatelessWidget {
               pw.SizedBox(height: 10),
               pw.Divider(thickness: 1.2, color: PdfColors.blue800),
               pw.SizedBox(height: 8),
-
-              // Data Pelanggan
               pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 4),
               pw.Container(
@@ -187,8 +181,6 @@ class BillingHomePage extends StatelessWidget {
                 ),
               ),
               pw.SizedBox(height: 10),
-
-              // Rincian Layanan & Harga Paket
               pw.Text('RINCIAN LAYANAN & TARIF', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 4),
               pw.Table(
@@ -212,8 +204,6 @@ class BillingHomePage extends StatelessWidget {
                 ],
               ),
               pw.SizedBox(height: 6),
-
-              // Rincian PPN & Total
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.end,
                 children: [
@@ -242,8 +232,6 @@ class BillingHomePage extends StatelessWidget {
                 ],
               ),
               pw.SizedBox(height: 8),
-
-              // Status & Petugas
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -260,8 +248,6 @@ class BillingHomePage extends StatelessWidget {
                 ],
               ),
               pw.SizedBox(height: 8),
-
-              // Instruksi Pembayaran (jika belum lunas)
               if (!isLunas) ...[
                 pw.Container(
                   padding: const pw.EdgeInsets.all(6),
@@ -280,8 +266,6 @@ class BillingHomePage extends StatelessWidget {
                 ),
                 pw.SizedBox(height: 6),
               ],
-
-              // Catatan / Notes
               pw.Container(
                 padding: const pw.EdgeInsets.all(5),
                 decoration: pw.BoxDecoration(color: PdfColors.grey100, border: pw.Border.all(color: PdfColors.grey300)),
@@ -328,7 +312,7 @@ class BillingHomePage extends StatelessWidget {
             children: [
               Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
               Text('Alamat       : ${item['alamat'] ?? '-'}'),
-              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
+              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'}'),
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
@@ -863,6 +847,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   }
 }
 
+// ================= TAB 2: HALAMAN PENGELUARAN (DENGAN EDIT LIST) =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
@@ -875,12 +860,24 @@ class PengeluaranPage extends StatefulWidget {
 }
 
 class _PengeluaranPageState extends State<PengeluaranPage> {
-  void _showTambahPengeluaranDialog(BuildContext context) {
-    final TextEditingController keteranganController = TextEditingController();
-    final TextEditingController nominalController = TextEditingController();
+  
+  // Dialog Tambah / Edit Pengeluaran dengan Fitur Belanja Aset Lengkap
+  void _showFormPengeluaranDialog(BuildContext context, {Map? itemEdit}) {
+    bool isEdit = itemEdit != null;
+    final TextEditingController keteranganController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : '');
+    final TextEditingController nominalController = TextEditingController(text: isEdit ? itemEdit['nominal'] : '');
+    
+    // Controller Khusus FO
+    final TextEditingController coreFoController = TextEditingController(text: '2');
+    final TextEditingController rollFoController = TextEditingController(text: '1');
+    final TextEditingController meterPerRollController = TextEditingController(text: '1000');
+
+    // Controller Aset Umum / Non-FO
     final TextEditingController jumlahStokController = TextEditingController(text: '1');
     final TextEditingController satuanStokController = TextEditingController(text: 'Pcs');
-    String selectedKategori = 'Operasional';
+
+    String selectedKategori = isEdit ? (itemEdit['kategori'] ?? 'Operasional') : 'Operasional';
+    String selectedJenisAset = 'ONT';
 
     final List<String> kategoriList = [
       'Belanja Aset',
@@ -891,42 +888,89 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
       'Maintenance / Pemeliharaan'
     ];
 
+    final List<String> jenisAsetList = [
+      'ONT',
+      'OLT',
+      'FO',
+      'STB',
+      'Patchcore',
+      'Protect',
+      'Tools',
+      'Aksesoris'
+    ];
+
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             bool isBelanjaAset = selectedKategori == 'Belanja Aset';
+            bool isFO = isBelanjaAset && selectedJenisAset == 'FO';
 
             return AlertDialog(
-              title: const Text('Tambah Pengeluaran'),
+              title: Text(isEdit ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField(
+                    DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
                       items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
-                    TextField(controller: keteranganController, decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama Perangkat / Aset' : 'Keterangan')),
+
+                    if (isBelanjaAset) ...[
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
+                        value: selectedJenisAset,
+                        items: jenisAsetList.map((j) => DropdownMenuItem(value: j, child: Text(j))).toList(),
+                        onChanged: (val) => setDialogState(() => selectedJenisAset = val.toString()),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    TextField(
+                      controller: keteranganController, 
+                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: nominalController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Nominal (Rp)')),
+                    TextField(
+                      controller: nominalController, 
+                      keyboardType: TextInputType.number, 
+                      decoration: const InputDecoration(labelText: 'Total Nominal (Rp)'),
+                    ),
                     
                     if (isBelanjaAset) ...[
                       const SizedBox(height: 15),
                       const Divider(),
-                      const Text('Otomatis Masuk ke Stok Barang:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Expanded(flex: 2, child: TextField(controller: jumlahStokController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Jumlah'))),
-                          const SizedBox(width: 10),
-                          Expanded(flex: 1, child: TextField(controller: satuanStokController, decoration: const InputDecoration(labelText: 'Satuan'))),
-                        ],
-                      ),
+                      const Text('Konfigurasi Stok Gudang Otomatis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                      const SizedBox(height: 8),
+
+                      if (isFO) ...[
+                        Row(
+                          children: [
+                            Expanded(child: TextField(controller: coreFoController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Banyak Core (Cth: 2/4)'))),
+                            const SizedBox(width: 8),
+                            Expanded(child: TextField(controller: rollFoController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Banyak Roll'))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: meterPerRollController, 
+                          keyboardType: TextInputType.number, 
+                          decoration: const InputDecoration(labelText: 'Meter Per Roll (Cth: 1000)'),
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(flex: 2, child: TextField(controller: jumlahStokController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Jumlah'))),
+                            const SizedBox(width: 10),
+                            Expanded(flex: 1, child: TextField(controller: satuanStokController, decoration: const InputDecoration(labelText: 'Satuan'))),
+                          ],
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -936,15 +980,36 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nominalController.text.isEmpty || keteranganController.text.isEmpty) return;
+                    
+                    // Hitung otomatis jika FO
+                    String finalJumlahStok = jumlahStokController.text;
+                    String finalSatuanStok = satuanStokController.text;
+                    String namaBarangFinal = keteranganController.text;
+
+                    if (isBelanjaAset) {
+                      if (isFO) {
+                        int rolls = int.tryParse(rollFoController.text) ?? 1;
+                        int meters = int.tryParse(meterPerRollController.text) ?? 1000;
+                        int totalMeter = rolls * meters;
+                        finalJumlahStok = totalMeter.toString();
+                        finalSatuanStok = 'Meter';
+                        namaBarangFinal = 'Kabel FO $coreFoController Core ($rolls Roll x $meters Meter)';
+                      } else {
+                        namaBarangFinal = '[$selectedJenisAset] ${keteranganController.text}';
+                      }
+                    }
+
                     final payload = {
-                      "action": "tambah_pengeluaran",
+                      "action": isEdit ? "edit_pengeluaran" : "tambah_pengeluaran",
+                      "index": isEdit ? widget.pengeluaran.indexOf(itemEdit) : null,
                       "kategori": selectedKategori,
-                      "keterangan": keteranganController.text,
+                      "keterangan": namaBarangFinal,
                       "nominal": nominalController.text,
-                      "jumlah_stok": jumlahStokController.text,
-                      "satuan_stok": satuanStokController.text,
-                      "tanggal": DateTime.now().toString().split(' ')[0],
+                      "jumlah_stok": finalJumlahStok,
+                      "satuan_stok": finalSatuanStok,
+                      "tanggal": isEdit ? (itemEdit['tanggal'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
                     };
+
                     Navigator.pop(context);
                     try {
                       final response = await http.post(
@@ -987,17 +1052,27 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                         leading: const Icon(Icons.money_off, color: Colors.red),
                         title: Text(item['keterangan'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTgl: ${item['tanggal'] ?? '-'}'),
-                        trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                              onPressed: () => _showFormPengeluaranDialog(context, itemEdit: item),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _showTambahPengeluaranDialog(context), child: const Icon(Icons.add)),
+      floatingActionButton: FloatingActionButton(onPressed: () => _showFormPengeluaranDialog(context), child: const Icon(Icons.add)),
     );
   }
 }
 
-class StokBarangPage extends StatelessWidget {
+// ================= TAB 3: HALAMAN STOK BARANG (DENGAN TAMBAH & EDIT STOK) =================
+class StokBarangPage extends StatefulWidget {
   final List stok;
   final bool isLoading;
   final Future<void> Function() onRefresh;
@@ -1005,28 +1080,115 @@ class StokBarangPage extends StatelessWidget {
   const StokBarangPage({super.key, required this.stok, required this.isLoading, required this.onRefresh});
 
   @override
+  State<StokBarangPage> createState() => _StokBarangPageState();
+}
+
+class _StokBarangPageState extends State<StokBarangPage> {
+
+  // Dialog Tambah Stok Gudang Manual atau Edit Stok
+  void _showFormStokDialog(BuildContext context, {Map? itemEdit}) {
+    bool isEdit = itemEdit != null;
+    final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama_barang'] : '');
+    final TextEditingController kategoriController = TextEditingController(text: isEdit ? itemEdit['kategori'] : 'ONT/Perangkat');
+    final TextEditingController jumlahController = TextEditingController(text: isEdit ? itemEdit['jumlah'].toString() : '1');
+    final TextEditingController satuanController = TextEditingController(text: isEdit ? itemEdit['satuan'] : 'Pcs');
+    final TextEditingController ketController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : 'Stok Gudang');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Barang')),
+                TextField(controller: kategoriController, decoration: const InputDecoration(labelText: 'Kategori')),
+                TextField(controller: jumlahController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Jumlah / Qty')),
+                TextField(controller: satuanController, decoration: const InputDecoration(labelText: 'Satuan (Pcs / Meter / Roll)')),
+                TextField(controller: ketController, decoration: const InputDecoration(labelText: 'Keterangan')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () async {
+                if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
+                final payload = {
+                  "action": isEdit ? "edit_stok" : "tambah_stok_manual",
+                  "index": isEdit ? widget.stok.indexOf(itemEdit) : null,
+                  "nama_barang": namaController.text,
+                  "kategori": kategoriController.text,
+                  "jumlah": jumlahController.text,
+                  "satuan": satuanController.text,
+                  "keterangan": ketController.text,
+                };
+                Navigator.pop(context);
+                try {
+                  final response = await http.post(
+                    Uri.parse(scriptUrl),
+                    headers: {"Content-Type": "application/json"},
+                    body: json.encode(payload),
+                  );
+                  if (response.statusCode == 200 || response.statusCode == 302) {
+                    widget.onRefresh();
+                  }
+                } catch (e) {
+                  // ignore
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Stok Barang Jaringan (${stok.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh)]),
-      body: isLoading
+      appBar: AppBar(
+        title: Text('Stok Barang Jaringan (${widget.stok.length})'), 
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)
+        ],
+      ),
+      body: widget.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : stok.isEmpty
+          : widget.stok.isEmpty
               ? const Center(child: Text('Belum ada stok barang.'))
               : ListView.builder(
-                  itemCount: stok.length,
+                  itemCount: widget.stok.length,
                   itemBuilder: (context, index) {
-                    final item = stok[index];
+                    final item = widget.stok[index];
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
                         leading: const Icon(Icons.router, color: Colors.indigo),
                         title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
-                        trailing: Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                              onPressed: () => _showFormStokDialog(context, itemEdit: item),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showFormStokDialog(context),
+        child: const Icon(Icons.add),
+        tooltip: 'Tambah Stok Barang',
+      ),
     );
   }
 }
@@ -1080,7 +1242,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
         totalPotensiTunggakan += total;
       }
 
-      // Deteksi jika ada material yang terpakai atau diganti saat perbaikan/pasang baru
       if (item['material_terpakai'] != null && item['material_terpakai'].toString() != '-' && item['material_terpakai'].toString().isNotEmpty) {
         rincianPenguranganMaterial.add({
           "pelanggan": item['nama'] ?? '-',
@@ -1110,7 +1271,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
         margin: const pw.EdgeInsets.all(28),
         build: (pw.Context context) {
           return [
-            // Header Laporan
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -1126,8 +1286,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
             pw.SizedBox(height: 8),
             pw.Divider(thickness: 1.2, color: PdfColors.blue800),
             pw.SizedBox(height: 8),
-
-            // Ringkasan Finansial
             pw.Row(
               children: [
                 pw.Expanded(
@@ -1175,8 +1333,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
               ],
             ),
             pw.SizedBox(height: 12),
-
-            // 1. Rincian Pemasukan dari Pelanggan
             pw.Text('1. RINCIAN PEMASUKAN PELANGGAN (LUNAS)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
             rincianPemasukanLunas.isEmpty
@@ -1204,8 +1360,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                     ],
                   ),
             pw.SizedBox(height: 12),
-
-            // 2. Rincian Pengurangan Material / Perangkat
             pw.Text('2. RINCIAN PENGURANGAN / PEMAKAIAN MATERIAL & PERANGKAT', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
             rincianPenguranganMaterial.isEmpty
@@ -1231,8 +1385,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                     ],
                   ),
             pw.SizedBox(height: 12),
-
-            // 3. Rekap Pengeluaran per Kategori
             pw.Text('3. REKAP PENGELUARAN OPERASIONAL', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
             pw.SizedBox(height: 4),
             pw.Table(
@@ -1318,7 +1470,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
