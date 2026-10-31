@@ -1297,11 +1297,58 @@ class _StokBarangPageState extends State<StokBarangPage> {
 
   void _showFormStokDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
+
+    final List<String> kategoriList = [
+      'Belanja Aset',
+      'ONT/Perangkat',
+      'Kabel FO',
+      'Aksesoris Jaringan',
+      'Tools & Peralatan',
+      'Operasional',
+      'Lainnya'
+    ];
+
+    final List<String> jenisBarangList = [
+      'ONT',
+      'OLT',
+      'FO',
+      'STB',
+      'Patchcore',
+      'Protect',
+      'Tools',
+      'Aksesoris',
+      'Umum'
+    ];
+
+    String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Belanja Aset').trim() : 'Belanja Aset';
+    if (!kategoriList.contains(selectedKategori)) {
+      if (selectedKategori.isNotEmpty) {
+        kategoriList.add(selectedKategori);
+      } else {
+        selectedKategori = 'Belanja Aset';
+      }
+    }
+
+    String selectedJenis = isEdit ? (itemEdit['jenis_barang']?.toString() ?? 'ONT').trim() : 'ONT';
+    if (isEdit && itemEdit['jenis_barang'] == null) {
+      String nama = itemEdit['nama_barang']?.toString() ?? '';
+      for (var j in jenisBarangList) {
+        if (nama.toLowerCase().contains(j.toLowerCase())) {
+          selectedJenis = j;
+          break;
+        }
+      }
+    }
+    if (!jenisBarangList.contains(selectedJenis)) {
+      if (selectedJenis.isNotEmpty) {
+        jenisBarangList.add(selectedJenis);
+      } else {
+        selectedJenis = 'ONT';
+      }
+    }
+
     final TextEditingController namaController = TextEditingController(
       text: isEdit ? (itemEdit['nama_barang']?.toString() ?? '') : '',
-    );
-    final TextEditingController kategoriController = TextEditingController(
-      text: isEdit ? (itemEdit['kategori']?.toString() ?? 'ONT/Perangkat') : 'ONT/Perangkat',
     );
     final TextEditingController jumlahController = TextEditingController(
       text: isEdit ? (itemEdit['jumlah']?.toString() ?? '1') : '1',
@@ -1316,51 +1363,95 @@ class _StokBarangPageState extends State<StokBarangPage> {
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Barang')),
-                TextField(controller: kategoriController, decoration: const InputDecoration(labelText: 'Kategori')),
-                TextField(controller: jumlahController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Jumlah / Qty')),
-                TextField(controller: satuanController, decoration: const InputDecoration(labelText: 'Satuan (Pcs / Meter / Roll)')),
-                TextField(controller: ketController, decoration: const InputDecoration(labelText: 'Keterangan')),
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Kategori'),
+                      value: selectedKategori,
+                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
+                      onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
+                      value: selectedJenis,
+                      items: jenisBarangList.map((j) => DropdownMenuItem(value: j, child: Text(j))).toList(),
+                      onChanged: (val) => setDialogState(() => selectedJenis = val.toString()),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: namaController,
+                      decoration: const InputDecoration(labelText: 'Nama / Merek Barang'),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: jumlahController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Jumlah / Qty'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 1,
+                          child: TextField(
+                            controller: satuanController,
+                            decoration: const InputDecoration(labelText: 'Satuan (Pcs / Meter / Roll)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: ketController,
+                      decoration: const InputDecoration(labelText: 'Keterangan'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
+                    final payload = {
+                      "action": isEdit ? "edit_stok" : "tambah_stok_manual",
+                      "index": isEdit ? widget.stok.indexOf(itemEdit) : null,
+                      "nama_barang": namaController.text,
+                      "kategori": selectedKategori,
+                      "jenis_barang": selectedJenis,
+                      "jumlah": jumlahController.text,
+                      "satuan": satuanController.text,
+                      "keterangan": ketController.text,
+                    };
+                    Navigator.pop(dialogContext);
+                    try {
+                      final response = await http.post(
+                        Uri.parse(scriptUrl),
+                        headers: {"Content-Type": "application/json"},
+                        body: json.encode(payload),
+                      );
+                      if (response.statusCode == 200 || response.statusCode == 302) {
+                        widget.onRefresh();
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  },
+                  child: const Text('Simpan'),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () async {
-                if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
-                final payload = {
-                  "action": isEdit ? "edit_stok" : "tambah_stok_manual",
-                  "index": isEdit ? widget.stok.indexOf(itemEdit) : null,
-                  "nama_barang": namaController.text,
-                  "kategori": kategoriController.text,
-                  "jumlah": jumlahController.text,
-                  "satuan": satuanController.text,
-                  "keterangan": ketController.text,
-                };
-                Navigator.pop(dialogContext);
-                try {
-                  final response = await http.post(
-                    Uri.parse(scriptUrl),
-                    headers: {"Content-Type": "application/json"},
-                    body: json.encode(payload),
-                  );
-                  if (response.statusCode == 200 || response.statusCode == 302) {
-                    widget.onRefresh();
-                  }
-                } catch (e) {
-                  // ignore
-                }
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
