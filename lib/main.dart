@@ -884,10 +884,10 @@ class PengeluaranPage extends StatefulWidget {
 }
 
 class _PengeluaranPageState extends State<PengeluaranPage> {
-  void _showPengeluaranDetailDialog(BuildContext context, Map item) {
+  void _showPengeluaranDetailDialog(BuildContext parentContext, Map item) {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           item['keterangan'] ?? 'Detail Pengeluaran',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -913,7 +913,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _confirmHapusPengeluaran(item);
             },
             icon: const Icon(Icons.delete, size: 18),
@@ -922,14 +922,14 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
             onPressed: () {
-              Navigator.pop(context);
-              _showFormPengeluaranDialog(context, itemEdit: item);
+              Navigator.pop(dialogContext);
+              _showFormPengeluaranDialog(parentContext, itemEdit: item);
             },
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('Edit'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Tutup'),
           ),
         ],
@@ -986,9 +986,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok'] ?? '1') : '1');
     final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok'] ?? 'Pcs') : 'Pcs');
 
-    String selectedKategori = isEdit ? (itemEdit['kategori'] ?? 'Operasional') : 'Operasional';
-    String selectedJenisAset = 'ONT';
-
     final List<String> kategoriList = [
       'Belanja Aset',
       'Operasional',
@@ -1000,6 +997,13 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     ];
 
     final List<String> jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
+
+    String selectedKategori = isEdit ? (itemEdit['kategori'] ?? 'Operasional').toString().trim() : 'Operasional';
+    if (!kategoriList.contains(selectedKategori)) {
+      selectedKategori = 'Operasional';
+    }
+
+    String selectedJenisAset = 'ONT';
 
     showDialog(
       context: context,
@@ -1187,10 +1191,10 @@ class StokBarangPage extends StatefulWidget {
 }
 
 class _StokBarangPageState extends State<StokBarangPage> {
-  void _showStokDetailDialog(BuildContext context, Map item) {
+  void _showStokDetailDialog(BuildContext parentContext, Map item) {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           item['nama_barang'] ?? 'Detail Barang',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1214,7 +1218,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _confirmHapusStok(item);
             },
             icon: const Icon(Icons.delete, size: 18),
@@ -1223,14 +1227,14 @@ class _StokBarangPageState extends State<StokBarangPage> {
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
             onPressed: () {
-              Navigator.pop(context);
-              _showFormStokDialog(context, itemEdit: item);
+              Navigator.pop(dialogContext);
+              _showFormStokDialog(parentContext, itemEdit: item);
             },
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('Edit'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Tutup'),
           ),
         ],
