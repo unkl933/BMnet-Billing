@@ -173,7 +173,7 @@ class BillingHomePage extends StatelessWidget {
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
                       value: selectedMetode,
-                      items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      items: metodeList.map((m) => DropdownMenuItem<String>(value: m, child: Text(m))).toList(),
                       onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
                     ),
                     const SizedBox(height: 15),
@@ -374,7 +374,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 decoration: const InputDecoration(labelText: 'Pilih Perangkat ONT yang Dipasang'),
                 value: selectedOnt,
                 items: ontList.isEmpty 
-                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
+                    ? [const DropdownMenuItem<String>(value: null, child: Text('Stok ONT Kosong'))]
                     : ontList.map((o) => DropdownMenuItem<String>(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
                 onChanged: (val) => setState(() => selectedOnt = val),
               ),
