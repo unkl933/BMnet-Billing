@@ -12,6 +12,14 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
+// Daftar Paket Global agar bisa diedit dan ditambah di seluruh halaman
+List> daftarPaketGlobal = [
+  {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
+  {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
+  {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
+  {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
+];
+
 void main() {
   runApp(const MaterialApp(
     home: MainNavigationScreen(),
@@ -19,7 +27,7 @@ void main() {
   ));
 }
 
-// ================= NAVIGASI UTAMA (4 TAB) =================
+// ================= NAVIGASI UTAMA (5 TAB) =================
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -66,6 +74,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       BillingHomePage(pelanggan: pelangganData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       PengeluaranPage(pengeluaran: pengeluaranData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       StokBarangPage(stok: stokData, isLoading: isLoading, onRefresh: fetchData),
+      PaketInternetPage(onUpdate: () => setState(() {})),
       DashboardKeuanganPage(pelanggan: pelangganData, pengeluaran: pengeluaranData, isLoading: isLoading, onRefresh: fetchData),
     ];
 
@@ -80,6 +89,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Pelanggan'),
           BottomNavigationBarItem(icon: Icon(Icons.money_off), label: 'Pengeluaran'),
           BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Stok'),
+          BottomNavigationBarItem(icon: Icon(Icons.wifi), label: 'Paket'),
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'Keuangan'),
         ],
       ),
@@ -331,7 +341,7 @@ class BillingHomePage extends StatelessWidget {
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
               Text('Alamat       : ${item['alamat'] ?? '-'}'),
@@ -571,14 +581,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   var selectedOnt;
   String selectedJatuhTempo = 'Tanggal 5';
   bool isSaving = false;
-
-  var daftarPaket = [
-    {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
-    {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
-    {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
-    {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
-  ];
-
   var selectedPaket;
 
   @override
@@ -603,7 +605,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               const SizedBox(height: 15),
               DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
-                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaket = val),
               ),
               TextFormField(
@@ -727,14 +729,6 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   String selectedStatus = 'Belum Lunas';
   var selectedOntBaru;
   bool isSaving = false;
-
-  var daftarPaket = [
-    {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
-    {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
-    {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
-    {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
-  ];
-
   var selectedPaketBaru;
 
   @override
@@ -750,7 +744,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
     selectedStatus = widget.pelangganItem['status'] ?? 'Belum Lunas';
     
     var currentPaketName = widget.pelangganItem['paket'];
-    for (var p in daftarPaket) {
+    for (var p in daftarPaketGlobal) {
       if (p['nama'] == currentPaketName) {
         selectedPaketBaru = p;
         break;
@@ -780,7 +774,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Ganti Paket Internet'),
                 value: selectedPaketBaru,
-                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaketBaru = val),
               ),
 
@@ -894,7 +888,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
 
-    // Controller untuk Penarikan Jalur FO
     final TextEditingController meterFoJalurController = TextEditingController(text: isEdit ? (itemEdit['meter_fo'] ?? '0') : '0');
     final TextEditingController jumlahPekerjaController = TextEditingController(text: isEdit ? (itemEdit['jumlah_pekerja'] ?? '1') : '1');
     final TextEditingController tanggalJalurController = TextEditingController(text: isEdit ? (itemEdit['tanggal_jalur'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0]);
@@ -1072,10 +1065,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       "nominal": nominalController.text,
                       "jumlah_stok": finalJumlahStok,
                       "satuan_stok": finalSatuanStok,
-                      "meter_fo": isPenarikanJalur ? meterFoJalurController.text : null,
-                      "jumlah_pekerja": isPenarikanJalur ? jumlahPekerjaController.text : null,
-                      "tanggal_jalur": isPenarikanJalur ? tanggalJalurController.text : null,
-                      "wilayah": isPenarikanJalur ? wilayahJalurController.text : null,
                       "pemakaian_material": pemakaianMaterial.isNotEmpty ? pemakaianMaterial : null,
                       "tanggal": isEdit ? (itemEdit['tanggal'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
                     };
@@ -1262,7 +1251,93 @@ class _StokBarangPageState extends State<StokBarangPage> {
   }
 }
 
-// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN =================
+// ================= TAB 4: HALAMAN MANAJEMEN PAKET INTERNET =================
+class PaketInternetPage extends StatefulWidget {
+  final VoidCallback onUpdate;
+  const PaketInternetPage({super.key, required this.onUpdate});
+
+  @override
+  State<PaketInternetPage> createState() => _PaketInternetPageState();
+}
+
+class _PaketInternetPageState extends State<PaketInternetPage> {
+  void _showFormPaketDialog({Map<String, dynamic>? itemEdit}) {
+    bool isEdit = itemEdit != null;
+    final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama'] : '');
+    final TextEditingController hargaController = TextEditingController(text: isEdit ? itemEdit['harga'] : '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isEdit ? 'Edit Paket Internet' : 'Tambah Paket Internet Baru'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Paket (Cth: 30 Mbps)')),
+              const SizedBox(height: 10),
+              TextField(controller: hargaController, decoration: const InputDecoration(labelText: 'Harga (Cth: Rp 150.000)')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () {
+                if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
+                setState(() {
+                  if (isEdit) {
+                    itemEdit['nama'] = namaController.text;
+                    itemEdit['harga'] = hargaController.text;
+                  } else {
+                    daftarPaketGlobal.add({
+                      'nama': namaController.text,
+                      'harga': hargaController.text,
+                    });
+                  }
+                });
+                widget.onUpdate();
+                Navigator.pop(context);
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Daftar Paket Internet (${daftarPaketGlobal.length})')),
+      body: ListView.builder(
+        itemCount: daftarPaketGlobal.length,
+        itemBuilder: (context, index) {
+          final paket = daftarPaketGlobal[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: ListTile(
+              leading: const Icon(Icons.wifi, color: Colors.blueAccent),
+              title: Text(paket['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Tarif: ${paket['harga']} (+ PPN 11%)'),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _showFormPaketDialog(itemEdit: paket),
+              ),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showFormPaketDialog(),
+        child: const Icon(Icons.add),
+        tooltip: 'Tambah Paket Baru',
+      ),
+    );
+  }
+}
+
+// ================= TAB 5: DASHBOARD KEUANGAN & LAPORAN =================
 class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
@@ -1539,7 +1614,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
