@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data'; 
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
-
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
@@ -65,7 +64,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final pages = [
       BillingHomePage(pelanggan: pelangganData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
-      PengeluaranPage(pengeluaran: pengeluaranData, isLoading: isLoading, onRefresh: fetchData),
+      PengeluaranPage(pengeluaran: pengeluaranData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       StokBarangPage(stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       DashboardKeuanganPage(pelanggan: pelangganData, pengeluaran: pengeluaranData, isLoading: isLoading, onRefresh: fetchData),
     ];
@@ -100,7 +99,6 @@ class BillingHomePage extends StatelessWidget {
   Future<void> _sharePdfNotaWa(Map item, bool isLunas) async {
     final pdf = pw.Document();
     
-    // Muat logo dari asset untuk PDF
     pw.MemoryImage? logoImage;
     try {
       final ByteData bytes = await rootBundle.load('assets/images/logo.png');
@@ -124,7 +122,6 @@ class BillingHomePage extends StatelessWidget {
         build: (pw.Context context) {
           return pw.Stack(
             children: [
-              // Watermark Profesional di Latar Belakang
               if (logoImage != null)
                 pw.Center(
                   child: pw.Opacity(
@@ -132,8 +129,6 @@ class BillingHomePage extends StatelessWidget {
                     child: pw.Image(logoImage, width: 300, height: 300),
                   ),
                 ),
-              
-              // Konten Utama Nota / Kwitansi
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
@@ -336,11 +331,11 @@ class BillingHomePage extends StatelessWidget {
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
               Text('Alamat       : ${item['alamat'] ?? '-'}'),
-              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'}'),
+              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
@@ -658,11 +653,11 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   }
                   double dropcoreVal = double.tryParse(_dropcoreController.text) ?? 0;
                   if (dropcoreVal > 0) {
-                    materialPakai.add({"nama": "Kabel FO Dropcore", "qty": dropcoreVal});
+                    materialPakai.add({"nama": "Dropcore 1 Roll", "qty": dropcoreVal});
                   }
                   int patchcoreVal = int.tryParse(_patchcoreController.text) ?? 0;
                   if (patchcoreVal > 0) {
-                    materialPakai.add({"nama": "Patchcord / Pigtail", "qty": patchcoreVal});
+                    materialPakai.add({"nama": "Patchcore", "qty": patchcoreVal});
                   }
 
                   String materialStr = "ONT: ${selectedOnt ?? '-'}, Dropcore: ${_dropcoreController.text}m, Patchcore: ${_patchcoreController.text}pcs";
@@ -878,10 +873,11 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
 // ================= TAB 2: HALAMAN PENGELUARAN =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
+  final List stok;
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
-  const PengeluaranPage({super.key, required this.pengeluaran, required this.isLoading, required this.onRefresh});
+  const PengeluaranPage({super.key, required this.pengeluaran, required this.stok, required this.isLoading, required this.onRefresh});
 
   @override
   State<PengeluaranPage> createState() => _PengeluaranPageState();
@@ -898,8 +894,14 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
 
-    final TextEditingController jumlahStokController = TextEditingController(text: '1');
-    final TextEditingController satuanStokController = TextEditingController(text: 'Pcs');
+    // Controller untuk Penarikan Jalur FO
+    final TextEditingController meterFoJalurController = TextEditingController(text: isEdit ? (itemEdit['meter_fo'] ?? '0') : '0');
+    final TextEditingController jumlahPekerjaController = TextEditingController(text: isEdit ? (itemEdit['jumlah_pekerja'] ?? '1') : '1');
+    final TextEditingController tanggalJalurController = TextEditingController(text: isEdit ? (itemEdit['tanggal_jalur'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0]);
+    final TextEditingController wilayahJalurController = TextEditingController(text: isEdit ? (itemEdit['wilayah'] ?? '') : '');
+
+    final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok'] ?? '1') : '1');
+    final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok'] ?? 'Pcs') : 'Pcs');
 
     String selectedKategori = isEdit ? (itemEdit['kategori'] ?? 'Operasional') : 'Operasional';
     String selectedJenisAset = 'ONT';
@@ -910,7 +912,8 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
       'Gaji Karyawan',
       'Hutang',
       'Donasi Sosial',
-      'Maintenance / Pemeliharaan'
+      'Maintenance / Pemeliharaan',
+      'Penarikan Jalur FO'
     ];
 
     final List<String> jenisAsetList = [
@@ -930,6 +933,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             bool isBelanjaAset = selectedKategori == 'Belanja Aset';
+            bool isPenarikanJalur = selectedKategori == 'Penarikan Jalur FO';
             bool isFO = isBelanjaAset && selectedJenisAset == 'FO';
 
             return AlertDialog(
@@ -956,15 +960,45 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       const SizedBox(height: 10),
                     ],
 
-                    TextField(
-                      controller: keteranganController, 
-                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
-                    ),
+                    if (isPenarikanJalur) ...[
+                      TextField(
+                        controller: wilayahJalurController,
+                        decoration: const InputDecoration(labelText: 'Wilayah Penarikan Jalur'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: meterFoJalurController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Banyak Kabel FO yang Digunakan (Meter)'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: jumlahPekerjaController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Jumlah Orang yang Mengerjakan'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: tanggalJalurController,
+                        decoration: const InputDecoration(labelText: 'Tanggal Penarikan (YYYY-MM-DD)'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: keteranganController,
+                        decoration: const InputDecoration(labelText: 'Keterangan Tambahan / Nama Jalur'),
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: keteranganController, 
+                        decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
+                      ),
+                    ],
+
                     const SizedBox(height: 10),
                     TextField(
                       controller: nominalController, 
                       keyboardType: TextInputType.number, 
-                      decoration: const InputDecoration(labelText: 'Total Nominal (Rp)'),
+                      decoration: const InputDecoration(labelText: 'Total Nominal Biaya (Rp)'),
                     ),
                     
                     if (isBelanjaAset) ...[
@@ -1004,11 +1038,12 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
                 ElevatedButton(
                   onPressed: () async {
-                    if (nominalController.text.isEmpty || keteranganController.text.isEmpty) return;
+                    if (nominalController.text.isEmpty) return;
                     
                     String finalJumlahStok = jumlahStokController.text;
                     String finalSatuanStok = satuanStokController.text;
                     String namaBarangFinal = keteranganController.text;
+                    List pemakaianMaterial = [];
 
                     if (isBelanjaAset) {
                       if (isFO) {
@@ -1017,9 +1052,15 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                         int totalMeter = rolls * meters;
                         finalJumlahStok = totalMeter.toString();
                         finalSatuanStok = 'Meter';
-                        namaBarangFinal = 'Kabel FO $coreFoController Core ($rolls Roll x $meters Meter)';
+                        namaBarangFinal = 'Kabel FO ${coreFoController.text} Core ($rolls Roll x $meters Meter)';
                       } else {
                         namaBarangFinal = '[$selectedJenisAset] ${keteranganController.text}';
+                      }
+                    } else if (isPenarikanJalur) {
+                      double meterFo = double.tryParse(meterFoJalurController.text) ?? 0;
+                      namaBarangFinal = 'Penarikan Jalur FO di ${wilayahJalurController.text} (${meterFo} Meter, ${jumlahPekerjaController.text} Orang)';
+                      if (meterFo > 0) {
+                        pemakaianMaterial.add({"nama": "Kabel FO", "qty": meterFo});
                       }
                     }
 
@@ -1031,6 +1072,11 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       "nominal": nominalController.text,
                       "jumlah_stok": finalJumlahStok,
                       "satuan_stok": finalSatuanStok,
+                      "meter_fo": isPenarikanJalur ? meterFoJalurController.text : null,
+                      "jumlah_pekerja": isPenarikanJalur ? jumlahPekerjaController.text : null,
+                      "tanggal_jalur": isPenarikanJalur ? tanggalJalurController.text : null,
+                      "wilayah": isPenarikanJalur ? wilayahJalurController.text : null,
+                      "pemakaian_material": pemakaianMaterial.isNotEmpty ? pemakaianMaterial : null,
                       "tanggal": isEdit ? (itemEdit['tanggal'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
                     };
 
@@ -1493,7 +1539,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
