@@ -94,10 +94,18 @@ class BillingHomePage extends StatelessWidget {
 
   const BillingHomePage({super.key, required this.pelanggan, required this.stok, required this.isLoading, required this.onRefresh});
 
-  // Fungsi Generate & Share PDF Struk/Nota langsung ke WhatsApp
+  // Fungsi Generate & Share PDF Nota / Kwitansi Profesional
   Future<void> _sharePdfNotaWa(Map item, bool isLunas) async {
     final pdf = pw.Document();
-    
+    final now = DateTime.now();
+    final tanggalCetak = "${now.day}/${now.month}/${now.year}";
+    final noRef = isLunas ? "KW/BM/${now.year}/${now.month}/${item['idpel'] ?? '891'}" : "INV/BM/${now.year}/${now.month}/${item['idpel'] ?? '042'}";
+
+    // Hitung rincian harga & PPN 11%
+    int totalNominal = int.tryParse((item['total_tunggakan'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
+    int dpp = (totalNominal / 1.11).round();
+    int ppn = totalNominal - dpp;
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -106,80 +114,183 @@ class BillingHomePage extends StatelessWidget {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // Header Perusahaan (Nama: BM Network Warna Biru & Logo)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  pw.Row(
                     children: [
-                      pw.Text('BMnet ISP', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                      pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                      // Logo Placeholder / Kotak Identitas
+                      pw.Container(
+                        width: 35,
+                        height: 35,
+                        decoration: const pw.BoxDecoration(color: PdfColors.blue800, shape: pw.BoxShape.circle),
+                        child: pw.Center(
+                          child: pw.Text('BN', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                      pw.SizedBox(width: 10),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('BM Network', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                          pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('Jl. Utama Networking No. 88 | WA: 0812-3456-7890', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                        ],
+                      ),
                     ],
                   ),
-                  pw.Text(isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.red800)),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.blue800)),
+                      pw.SizedBox(height: 2),
+                      pw.Text('No: $noRef', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      pw.Text('Tanggal: $tanggalCetak', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                    ],
+                  ),
                 ],
               ),
-              pw.SizedBox(height: 15),
-              pw.Divider(thickness: 1.5, color: PdfColors.blue800),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 1.2, color: PdfColors.blue800),
+              pw.SizedBox(height: 8),
+
+              // Data Pelanggan
+              pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 4),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(6),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: pw.BorderRadius.circular(4)),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Row(children: [
+                      pw.SizedBox(width: 90, child: pw.Text('ID Pelanggan', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Expanded(child: pw.Text(': ${item['idpel'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
+                    ]),
+                    pw.SizedBox(height: 2),
+                    pw.Row(children: [
+                      pw.SizedBox(width: 90, child: pw.Text('Nama Lengkap', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Expanded(child: pw.Text(': ${item['nama'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
+                    ]),
+                    pw.SizedBox(height: 2),
+                    pw.Row(children: [
+                      pw.SizedBox(width: 90, child: pw.Text('Alamat', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Expanded(child: pw.Text(': ${item['alamat'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
+                    ]),
+                    pw.SizedBox(height: 2),
+                    pw.Row(children: [
+                      pw.SizedBox(width: 90, child: pw.Text('No WhatsApp', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Expanded(child: pw.Text(': ${item['no_hp'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
+                    ]),
+                  ],
+                ),
+              ),
               pw.SizedBox(height: 10),
 
-              pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 5),
-              pw.Text('ID Pelanggan : ${item['idpel'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
-              pw.Text('Nama         : ${item['nama'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
-              pw.Text('Alamat       : ${item['alamat'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
-              pw.Text('No WhatsApp  : ${item['no_hp'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
-              
-              pw.SizedBox(height: 15),
-              pw.Text('RINCIAN PEMBAYARAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 5),
+              // Rincian Layanan & Harga Paket
+              pw.Text('RINCIAN LAYANAN & TARIF', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 4),
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400),
                 children: [
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Deskripsi Layanan', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Periode', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Deskripsi Paket / Layanan', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Periode (Bln)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Jumlah', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Paket Internet ${item['paket']}', style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan', style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${item['total_tunggakan']}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Paket Internet: ${item['paket'] ?? '-'}\nLangganan Akses Internet Unlimited', style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('${item['jumlah_bulan_tunggakan'] ?? '1'}', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right)),
                     ],
                   ),
                 ],
               ),
-              
-              pw.SizedBox(height: 20),
+              pw.SizedBox(height: 6),
+
+              // Rincian PPN & Total
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.SizedBox(
+                    width: 200,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                          pw.Text('Subtotal (Excl. PPN):', style: const pw.TextStyle(fontSize: 8)),
+                          pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8)),
+                        ]),
+                        pw.SizedBox(height: 2),
+                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                          pw.Text('PPN 11%:', style: const pw.TextStyle(fontSize: 8)),
+                          pw.Text('Rp $ppn', style: const pw.TextStyle(fontSize: 8)),
+                        ]),
+                        pw.Divider(thickness: 0.8),
+                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                          pw.Text('TOTAL PEMBAYARAN:', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                          pw.Text('Rp $totalNominal', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 8),
+
+              // Status & Petugas
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Status: ${isLunas ? "LUNAS" : "BELUM LUNAS"}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green : PdfColors.red)),
+                      pw.Text('Status: ${isLunas ? "LUNAS" : "BELUM LUNAS"}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.red800)),
                       if (isLunas) ...[
-                        pw.Text('Metode: ${item['metode_pembayaran'] ?? "-"}', style: const pw.TextStyle(fontSize: 9)),
-                        pw.Text('Petugas: ${item['petugas_penerima'] ?? "Admin BMnet"}', style: const pw.TextStyle(fontSize: 9)),
+                        pw.Text('Metode Bayar: ${item['metode_pembayaran'] ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
+                        pw.Text('Admin / Petugas: ${item['petugas_penerima'] ?? "Admin BM Network"}', style: const pw.TextStyle(fontSize: 8)),
                       ]
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('TOTAL: Rp ${item['total_tunggakan']}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
                     ],
                   ),
                 ],
               ),
-              pw.SizedBox(height: 30),
-              pw.Divider(),
-              pw.Center(
-                child: pw.Text('Terima kasih telah menggunakan layanan BMnet ISP', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+              pw.SizedBox(height: 8),
+
+              // Instruksi Pembayaran (jika belum lunas)
+              if (!isLunas) ...[
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(6),
+                  decoration: pw.BoxDecoration(color: PdfColors.blue50, border: pw.Border.all(color: PdfColors.blue200), borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('METODE PEMBAYARAN (TRANSFER BANK, E-WALLET & QRIS):', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.SizedBox(height: 3),
+                      pw.Text('• Transfer Bank BCA: 2801-971-611 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
+                      pw.Text('• E-Wallet (DANA / OVO / GoPay / ShopeePay): 0838-2777-7207 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
+                      pw.Text('• QRIS: Scan kode QR resmi BM Network pada aplikasi Mobile Banking atau E-Wallet Anda.', style: const pw.TextStyle(fontSize: 7)),
+                      pw.Text('• Mohon cantumkan ID Pelanggan (${item['idpel']}) pada catatan/berita transfer.', style: const pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+              ],
+
+              // Catatan / Notes
+              pw.Container(
+                padding: const pw.EdgeInsets.all(5),
+                decoration: pw.BoxDecoration(color: PdfColors.grey100, border: pw.Border.all(color: PdfColors.grey300)),
+                child: pw.Text(
+                  isLunas 
+                    ? "Terima kasih, pembayaran Anda telah diterima sah oleh sistem BM Network. Simpan kwitansi ini sebagai bukti pembayaran yang sah."
+                    : "PERHATIAN: Mohon lakukan pembayaran sebelum tanggal jatuh tempo untuk menghindari isolir otomatis jaringan internet Anda. Abaikan penagihan jika pembayaran telah dilakukan.",
+                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
+                ),
               ),
             ],
           );
@@ -195,11 +306,11 @@ class BillingHomePage extends StatelessWidget {
       await Share.shareXFiles(
         [XFile(file.path)],
         text: isLunas 
-            ? "Berikut adalah Kwitansi Pelunasan Resmi internet BMnet untuk ${item['nama']}. Terima kasih!" 
-            : "Berikut adalah Nota Tagihan internet BMnet untuk ${item['nama']}. Silakan lakukan pembayaran sebelum jatuh tempo.",
+            ? "Halo ${item['nama']}, berikut terlampir Kwitansi Pelunasan Resmi digital dari BM Network. Terima kasih!" 
+            : "Halo ${item['nama']}, berikut terlampir Nota Tagihan internet BM Network untuk paket ${item['paket']}. Silakan lakukan pembayaran sebelum jatuh tempo. Abaikan penagihan jika pembayaran telah dilakukan.",
       );
     } catch (e) {
-      // Handle error
+      // ignore
     }
   }
 
@@ -268,7 +379,7 @@ class BillingHomePage extends StatelessWidget {
 
   void _showBayarDialog(BuildContext context, Map item) {
     String selectedMetode = 'Tunai';
-    final TextEditingController petugasController = TextEditingController(text: 'Admin BMnet');
+    final TextEditingController petugasController = TextEditingController(text: 'Admin BM Network');
     final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS', 'DANA', 'GoPay', 'ShopeePay', 'OVO'];
 
     showDialog(
@@ -920,6 +1031,7 @@ class StokBarangPage extends StatelessWidget {
   }
 }
 
+// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN LENGKAP =================
 class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
@@ -948,14 +1060,33 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     int totalPengeluaran = 0;
 
     Map<String, int> rekapKategoriPengeluaran = {};
+    List rincianPemasukanLunas = [];
+    List rincianPenguranganMaterial = [];
 
     for (var item in widget.pelanggan) {
       final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
       final total = _parseNominal(item['total_tunggakan']);
       if (status == 'lunas') {
         totalLunas += total;
+        rincianPemasukanLunas.add({
+          "nama": item['nama'] ?? '-',
+          "idpel": item['idpel'] ?? '-',
+          "paket": item['paket'] ?? '-',
+          "metode": item['metode_pembayaran'] ?? 'Tunai',
+          "petugas": item['petugas_penerima'] ?? 'Admin',
+          "nominal": total,
+        });
       } else {
         totalPotensiTunggakan += total;
+      }
+
+      // Deteksi jika ada material yang terpakai atau diganti saat perbaikan/pasang baru
+      if (item['material_terpakai'] != null && item['material_terpakai'].toString() != '-' && item['material_terpakai'].toString().isNotEmpty) {
+        rincianPenguranganMaterial.add({
+          "pelanggan": item['nama'] ?? '-',
+          "material": item['material_terpakai'],
+          "teknisi": item['teknisi'] ?? '-',
+        });
       }
     }
 
@@ -974,98 +1105,164 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     final tglCetak = "${now.day}/${now.month}/${now.year}";
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(28),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('BMnet ISP - REKAP KEUANGAN & LABA RUGI BULANAN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.Text('Periode: $selectedPeriode (${now.year}) | Tanggal Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 1.5, color: PdfColors.blue800),
-              pw.SizedBox(height: 10),
+          return [
+            // Header Laporan
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('BM Network - LAPORAN KEUANGAN & REKAP BULANAN', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                    pw.Text('Periode: $selectedPeriode (${now.year}) | Tanggal Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 8),
+            pw.Divider(thickness: 1.2, color: PdfColors.blue800),
+            pw.SizedBox(height: 8),
 
-              pw.Row(
-                children: [
-                  pw.Expanded(
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.all(8),
-                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.green300), color: PdfColors.green50),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text('PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
-                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                          pw.Text('PPN 11%: Rp $ppnLunas', style: const pw.TextStyle(fontSize: 7)),
-                        ],
-                      ),
+            // Ringkasan Finansial
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(6),
+                    decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.green300), color: PdfColors.green50),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                        pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('PPN 11%: Rp $ppnLunas', style: const pw.TextStyle(fontSize: 6)),
+                      ],
                     ),
                   ),
-                  pw.SizedBox(width: 5),
-                  pw.Expanded(
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.all(8),
-                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.orange300), color: PdfColors.orange50),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text('TOTAL TUNGGAKAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800)),
-                          pw.Text('Rp $totalPotensiTunggakan', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                        ],
-                      ),
+                ),
+                pw.SizedBox(width: 4),
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(6),
+                    decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.orange300), color: PdfColors.orange50),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('TOTAL PIUTANG', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800)),
+                        pw.Text('Rp $totalPotensiTunggakan', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      ],
                     ),
                   ),
-                  pw.SizedBox(width: 5),
-                  pw.Expanded(
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.all(8),
-                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red300), color: PdfColors.red50),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text('PENGELUARAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
-                          pw.Text('Rp $totalPengeluaran', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                        ],
-                      ),
+                ),
+                pw.SizedBox(width: 4),
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(6),
+                    decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red300), color: PdfColors.red50),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('PENGELUARAN', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+                        pw.Text('Rp $totalPengeluaran', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              pw.SizedBox(height: 15),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
 
-              pw.Text('REKAP PENGELUARAN PER KATEGORI', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 5),
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            // 1. Rincian Pemasukan dari Pelanggan
+            pw.Text('1. RINCIAN PEMASUKAN PELANGGAN (LUNAS)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.SizedBox(height: 4),
+            rincianPemasukanLunas.isEmpty
+                ? pw.Text('Belum ada transaksi pemasukan lunas.', style: const pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic))
+                : pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey400),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Kategori', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Nominal', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                      pw.TableRow(
+                        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Pelanggan (ID)', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Paket', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Metode & Admin', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Nominal', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                        ],
+                      ),
+                      ...rincianPemasukanLunas.map((p) => pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${p['nama']} (${p['idpel']})', style: const pw.TextStyle(fontSize: 7))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(p['paket'], style: const pw.TextStyle(fontSize: 7))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${p['metode']} / ${p['petugas']}', style: const pw.TextStyle(fontSize: 7))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Rp ${p['nominal']}', style: const pw.TextStyle(fontSize: 7), textAlign: pw.TextAlign.right)),
+                        ],
+                      )),
                     ],
                   ),
-                  ...rekapKategoriPengeluaran.entries.map((e) => pw.TableRow(
+            pw.SizedBox(height: 12),
+
+            // 2. Rincian Pengurangan Material / Perangkat
+            pw.Text('2. RINCIAN PENGURANGAN / PEMAKAIAN MATERIAL & PERANGKAT', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.SizedBox(height: 4),
+            rincianPenguranganMaterial.isEmpty
+                ? pw.Text('Tidak ada riwayat pengurangan material pada periode ini.', style: const pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic))
+                : pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey400),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 8))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right)),
+                      pw.TableRow(
+                        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Pelanggan', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Material / Perangkat Terpakai', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Teknisi Bertugas', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                        ],
+                      ),
+                      ...rincianPenguranganMaterial.map((m) => pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(m['pelanggan'], style: const pw.TextStyle(fontSize: 7))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(m['material'], style: const pw.TextStyle(fontSize: 7))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(m['teknisi'], style: const pw.TextStyle(fontSize: 7))),
+                        ],
+                      )),
                     ],
-                  )),
-                ],
-              ),
-              pw.SizedBox(height: 15),
-              pw.Text('LABA / RUGI BERSIH: Rp $labaBersih', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo)),
-            ],
-          );
+                  ),
+            pw.SizedBox(height: 12),
+
+            // 3. Rekap Pengeluaran per Kategori
+            pw.Text('3. REKAP PENGELUARAN OPERASIONAL', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.SizedBox(height: 4),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Kategori Pengeluaran', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Nominal', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                  ],
+                ),
+                ...rekapKategoriPengeluaran.entries.map((e) => pw.TableRow(
+                  children: [
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 7))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 7), textAlign: pw.TextAlign.right)),
+                  ],
+                )),
+              ],
+            ),
+            pw.SizedBox(height: 15),
+            pw.Text('LABA / RUGI BERSIH: Rp $labaBersih', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo)),
+          ];
         },
       ),
     );
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Rekap_Keuangan_Bulanan_BMnet.pdf',
+      name: 'Laporan_Keuangan_Lengkap_BMNetwork.pdf',
     );
   }
 
@@ -1114,7 +1311,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
                   onPressed: _cetakLaporanPdf,
                   icon: const Icon(Icons.print),
-                  label: Text('Cetak Rekap $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text('Cetak Laporan Lengkap $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 15),
                 Card(
