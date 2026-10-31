@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// PERBAIKAN: Gunakan penulisan List> dengan benar
+// Perbaikan deklarasi list global paket internet
 List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -345,7 +345,7 @@ class BillingHomePage extends StatelessWidget {
             children: [
               Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
               Text('Alamat       : ${item['alamat'] ?? '-'}'),
-              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
+              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'}'),
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
@@ -888,11 +888,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
 
-    final TextEditingController meterFoJalurController = TextEditingController(text: isEdit ? (itemEdit['meter_fo'] ?? '0') : '0');
-    final TextEditingController jumlahPekerjaController = TextEditingController(text: isEdit ? (itemEdit['jumlah_pekerja'] ?? '1') : '1');
-    final TextEditingController tanggalJalurController = TextEditingController(text: isEdit ? (itemEdit['tanggal_jalur'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0]);
-    final TextEditingController wilayahJalurController = TextEditingController(text: isEdit ? (itemEdit['wilayah'] ?? '') : '');
-
     final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok'] ?? '1') : '1');
     final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok'] ?? 'Pcs') : 'Pcs');
 
@@ -926,7 +921,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             bool isBelanjaAset = selectedKategori == 'Belanja Aset';
-            bool isPenarikanJalur = selectedKategori == 'Penarikan Jalur FO';
             bool isFO = isBelanjaAset && selectedJenisAset == 'FO';
 
             return AlertDialog(
@@ -953,40 +947,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       const SizedBox(height: 10),
                     ],
 
-                    if (isPenarikanJalur) ...[
-                      TextField(
-                        controller: wilayahJalurController,
-                        decoration: const InputDecoration(labelText: 'Wilayah Penarikan Jalur'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: meterFoJalurController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Banyak Kabel FO yang Digunakan (Meter)'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: jumlahPekerjaController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Jumlah Orang yang Mengerjakan'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: tanggalJalurController,
-                        decoration: const InputDecoration(labelText: 'Tanggal Penarikan (YYYY-MM-DD)'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: keteranganController,
-                        decoration: const InputDecoration(labelText: 'Keterangan Tambahan / Nama Jalur'),
-                      ),
-                    ] else ...[
-                      TextField(
-                        controller: keteranganController, 
-                        decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
-                      ),
-                    ],
-
+                    TextField(
+                      controller: keteranganController, 
+                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
+                    ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: nominalController, 
@@ -1036,7 +1000,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                     String finalJumlahStok = jumlahStokController.text;
                     String finalSatuanStok = satuanStokController.text;
                     String namaBarangFinal = keteranganController.text;
-                    List pemakaianMaterial = [];
 
                     if (isBelanjaAset) {
                       if (isFO) {
@@ -1049,12 +1012,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       } else {
                         namaBarangFinal = '[$selectedJenisAset] ${keteranganController.text}';
                       }
-                    } else if (isPenarikanJalur) {
-                      double meterFo = double.tryParse(meterFoJalurController.text) ?? 0;
-                      namaBarangFinal = 'Penarikan Jalur FO di ${wilayahJalurController.text} (${meterFo} Meter, ${jumlahPekerjaController.text} Orang)';
-                      if (meterFo > 0) {
-                        pemakaianMaterial.add({"nama": "Kabel FO", "qty": meterFo});
-                      }
                     }
 
                     final payload = {
@@ -1065,7 +1022,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       "nominal": nominalController.text,
                       "jumlah_stok": finalJumlahStok,
                       "satuan_stok": finalSatuanStok,
-                      "pemakaian_material": pemakaianMaterial.isNotEmpty ? pemakaianMaterial : null,
                       "tanggal": isEdit ? (itemEdit['tanggal'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
                     };
 
@@ -1614,7 +1570,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
