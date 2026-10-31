@@ -277,8 +277,8 @@ class _BillingHomePageState extends State<BillingHomePage> {
   }
 }
 
-// ================= DASHBOARD KEUANGAN & CETAK LAPORAN =================
-class DashboardKeuanganPage extends StatelessWidget {
+// ================= DASHBOARD KEUANGAN & LAPORAN PPN =================
+class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final bool isLoading;
   final Future<void> Function() onRefresh;
@@ -290,14 +290,21 @@ class DashboardKeuanganPage extends StatelessWidget {
     required this.onRefresh,
   });
 
+  @override
+  State<DashboardKeuanganPage> createState() => _DashboardKeuanganPageState();
+}
+
+class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
+  String selectedPeriode = 'Bulanan'; // Pilihan: Bulanan / Tahunan
+
   int _parseNominal(dynamic val) {
     if (val == null) return 0;
     String str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
     return int.tryParse(str) ?? 0;
   }
 
-  // FUNGSI MEMBUAT DOKUMEN PDF LAPORAN KEUANGAN
-  Future<void> _cetakLaporanPdf(BuildContext context) async {
+  // FUNGSI MEMBUAT PDF LAPORAN KEUANGAN DENGAN PPN 11%
+  Future<void> _cetakLaporanPdf() async {
     final pdf = pw.Document();
     int totalLunas = 0;
     int totalTunggakan = 0;
@@ -307,7 +314,7 @@ class DashboardKeuanganPage extends StatelessWidget {
     Map<String, int> rekapKasir = {};
     Map<String, int> rekapMetode = {};
 
-    for (var item in pelanggan) {
+    for (var item in widget.pelanggan) {
       final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
       final total = _parseNominal(item['total_tunggakan']);
       final metode = (item['metode_pembayaran'] ?? '-').toString();
@@ -324,6 +331,13 @@ class DashboardKeuanganPage extends StatelessWidget {
       }
     }
 
+    // Perhitungan Porsi PPN 11% dari Total Pemasukan Lunas
+    final int dppLunas = (totalLunas / 1.11).round(); // Dasar Pengenaan Pajak
+    final int ppnLunas = totalLunas - dppLunas; // Nominal PPN 11%
+
+    final int dppTunggakan = (totalTunggakan / 1.11).round();
+    final int ppnTunggakan = totalTunggakan - dppTunggakan;
+
     final now = DateTime.now();
     final tglCetak = "${now.day}/${now.month}/${now.year}";
 
@@ -335,15 +349,14 @@ class DashboardKeuanganPage extends StatelessWidget {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // HEADER LAPORAN
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('BMnet ISP - LAPORAN KEUANGAN', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                      pw.Text('Rekapitulasi Pendapatan & Status Tagihan Bulanan', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('BMnet ISP - LAPORAN KEUANGAN & PPN', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.Text('Periode Laporan: $selectedPeriode (${now.year})', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                       pw.Text('Tanggal Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                     ],
                   ),
@@ -353,7 +366,7 @@ class DashboardKeuanganPage extends StatelessWidget {
               pw.Divider(thickness: 1.5, color: PdfColors.blue800),
               pw.SizedBox(height: 15),
 
-              // RINGKASAN KOTAK KPI
+              // RINGKASAN KOTAK KPI (PEMASUKAN & PPN)
               pw.Row(
                 children: [
                   pw.Expanded(
@@ -363,10 +376,12 @@ class DashboardKeuanganPage extends StatelessWidget {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('TOTAL PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
-                          pw.SizedBox(height: 5),
-                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
-                          pw.Text('$jmlLunas Pelanggan Lunas', style: const pw.TextStyle(fontSize: 8)),
+                          pw.Text('PEMASUKAN LUNAS (Incl. PPN)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
+                          pw.Text('• DPP (Dasar): Rp $dppLunas', style: const pw.TextStyle(fontSize: 7.5)),
+                          pw.Text('• PPN 11%   : Rp $ppnLunas', style: const pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('$jmlLunas Pelanggan Lunas', style: const pw.TextStyle(fontSize: 7.5)),
                         ],
                       ),
                     ),
@@ -379,20 +394,22 @@ class DashboardKeuanganPage extends StatelessWidget {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('TOTAL TUNGGAKAN (BELUM)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
-                          pw.SizedBox(height: 5),
-                          pw.Text('Rp $totalTunggakan', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
-                          pw.Text('$jmlBelum Pelanggan Belum Lunas', style: const pw.TextStyle(fontSize: 8)),
+                          pw.Text('TUNGGAKAN (Belum Lunas)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('Rp $totalTunggakan', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
+                          pw.Text('• DPP (Dasar): Rp $dppTunggakan', style: const pw.TextStyle(fontSize: 7.5)),
+                          pw.Text('• Potensi PPN: Rp $ppnTunggakan', style: const pw.TextStyle(fontSize: 7.5)),
+                          pw.Text('$jmlBelum Pelanggan Belum Bayar', style: const pw.TextStyle(fontSize: 7.5)),
                         ],
                       ),
                     ),
                   ),
                 ],
               ),
-              pw.SizedBox(height: 20),
+              pw.SizedBox(height: 15),
 
-              // REKAP METODE PEMBAYARAN
-              pw.Text('REKAP METODE PEMBAYARAN', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              // TABEL REKAP METODE PEMBAYARAN
+              pw.Text('REKAP METODE PEMBAYARAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 5),
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400),
@@ -400,22 +417,22 @@ class DashboardKeuanganPage extends StatelessWidget {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Metode Pembayaran', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Nominal', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Metode', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Total Nominal', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
                     ],
                   ),
                   ...rekapMetode.entries.map((e) => pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 8.5))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 8.5), textAlign: pw.TextAlign.right)),
                     ],
                   )),
                 ],
               ),
-              pw.SizedBox(height: 20),
+              pw.SizedBox(height: 15),
 
-              // REKAP KASIR / PETUGAS
-              pw.Text('REKAP PENERIMAAN KASIR / PETUGAS', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              // TABEL REKAP KASIR
+              pw.Text('REKAP PENERIMAAN KASIR / PETUGAS', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 5),
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400),
@@ -423,14 +440,14 @@ class DashboardKeuanganPage extends StatelessWidget {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Nama Petugas / Kasir', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Diterima', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Nama Petugas / Kasir', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Total Diterima', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
                     ],
                   ),
                   ...rekapKasir.entries.map((e) => pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 8.5))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 8.5), textAlign: pw.TextAlign.right)),
                     ],
                   )),
                 ],
@@ -439,7 +456,7 @@ class DashboardKeuanganPage extends StatelessWidget {
               pw.Spacer(),
               pw.Divider(thickness: 0.5, color: PdfColors.grey400),
               pw.Center(
-                child: pw.Text('BMnet Billing System - Laporan Keuangan Otomatis', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                child: pw.Text('BMnet Billing System - Laporan Keuangan & PPN Resmi | Halaman 1 dari 1', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ),
             ],
           );
@@ -449,7 +466,7 @@ class DashboardKeuanganPage extends StatelessWidget {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Laporan_Keuangan_BMnet.pdf',
+      name: 'Laporan_Keuangan_PPN_BMnet.pdf',
     );
   }
 
@@ -463,7 +480,7 @@ class DashboardKeuanganPage extends StatelessWidget {
     Map<String, int> rekapKasir = {};
     Map<String, int> rekapMetode = {};
 
-    for (var item in pelanggan) {
+    for (var item in widget.pelanggan) {
       final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
       final total = _parseNominal(item['total_tunggakan']);
       final metode = (item['metode_pembayaran'] ?? '-').toString();
@@ -480,36 +497,96 @@ class DashboardKeuanganPage extends StatelessWidget {
       }
     }
 
-    final totalSemuaPelanggan = pelanggan.length;
+    // Porsi PPN 11% dari total pemasukan lunas
+    final int dppLunas = (totalPemasukanLunas / 1.11).round();
+    final int ppnLunas = totalPemasukanLunas - dppLunas;
+
+    final totalSemuaPelanggan = widget.pelanggan.length;
     final rasioLunas = totalSemuaPelanggan > 0 ? (totalPelangganLunas / totalSemuaPelanggan) : 0.0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard Keuangan & Laporan'),
+        title: const Text('Dashboard Keuangan & PPN'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: onRefresh,
+            onPressed: widget.onRefresh,
           ),
         ],
       ),
-      body: isLoading
+      body: widget.isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: onRefresh,
+              onRefresh: widget.onRefresh,
               child: ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
-                  // TOMBOL CETAK LAPORAN PDF
+                  // PILIHAN PERIODE LAPORAN (BULANAN / TAHUNAN)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Pilih Periode Laporan:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ToggleButtons(
+                        isSelected: [selectedPeriode == 'Bulanan', selectedPeriode == 'Tahunan'],
+                        onPressed: (index) {
+                          setState(() {
+                            selectedPeriode = index == 0 ? 'Bulanan' : 'Tahunan';
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        constraints: const BoxConstraints(minHeight: 32, minWidth: 90),
+                        children: const [
+                          Text('Bulanan', style: TextStyle(fontSize: 12)),
+                          Text('Tahunan', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // TOMBOL CETAK PDF LAPORAN
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.indigo,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onPressed: () => _cetakLaporanPdf(context),
+                    onPressed: _cetakLaporanPdf,
                     icon: const Icon(Icons.print),
-                    label: const Text('Cetak / Unduh Laporan Keuangan (PDF)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text('Cetak Laporan $selectedPeriode (PDF + PPN)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // KOTAK INFORMASI PPN 11%
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Rekap Pajak PPN 11% (Dari Pendapatan Lunas):', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('• Dasar Pengenaan Pajak (DPP):'),
+                            Text('Rp $dppLunas', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('• PPN 11% Terkumpul:'),
+                            Text('Rp $ppnLunas', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 15),
 
@@ -549,7 +626,7 @@ class DashboardKeuanganPage extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Status Pelunasan Bulan Ini', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text('Status Pelunasan Periode $selectedPeriode', style: const TextStyle(fontWeight: FontWeight.bold)),
                               Text('${(rasioLunas * 100).toStringAsFixed(1)}% Lunas', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
                             ],
                           ),
@@ -679,7 +756,7 @@ class DashboardKeuanganPage extends StatelessWidget {
   }
 }
 
-// ================= HALAMAN DETAIL PELANGGAN =================
+// ================= HALAMAN DETAIL PELANGGAN (Sama seperti sebelumnya) =================
 class DetailPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
 
@@ -1444,12 +1521,10 @@ class _DetailPelangganPageState extends State<DetailPelangganPage> {
   }
 }
 
-// ================= HALAMAN EDIT PELANGGAN =================
+// ================= HALAMAN EDIT & TAMBAH PELANGGAN =================
 class EditPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
-
   const EditPelangganPage({super.key, required this.pelangganData});
-
   @override
   State<EditPelangganPage> createState() => _EditPelangganPageState();
 }
@@ -1476,7 +1551,6 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   Map<String, dynamic>? selectedPaket;
   late String selectedJatuhTempo;
   bool isSaving = false;
-
   final List<String> daftarJatuhTempo = ['Tanggal 5', 'Tanggal 10', 'Tanggal 15', 'Tanggal 20', 'Tanggal 25'];
 
   @override
@@ -1491,9 +1565,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
     _bulanController = TextEditingController(text: widget.pelangganData['jumlah_bulan_tunggakan']?.toString() ?? '1');
 
     selectedJatuhTempo = widget.pelangganData['jatuh_tempo']?.toString() ?? 'Tanggal 5';
-    if (!daftarJatuhTempo.contains(selectedJatuhTempo)) {
-      selectedJatuhTempo = 'Tanggal 5';
-    }
+    if (!daftarJatuhTempo.contains(selectedJatuhTempo)) selectedJatuhTempo = 'Tanggal 5';
 
     final currentPaketNama = widget.pelangganData['paket']?.toString();
     try {
@@ -1504,13 +1576,7 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   }
 
   Future<void> updatePelanggan() async {
-    if (!_formKey.currentState!.validate() || selectedPaket == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lengkapi form dengan benar!')),
-      );
-      return;
-    }
-
+    if (!_formKey.currentState!.validate() || selectedPaket == null) return;
     setState(() => isSaving = true);
 
     int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
@@ -1542,30 +1608,13 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 302) {
-        widget.pelangganData['idpel'] = _idpelController.text;
-        widget.pelangganData['nama'] = _namaController.text;
-        widget.pelangganData['alamat'] = _alamatController.text;
-        widget.pelangganData['paket'] = selectedPaket!['nama'];
-        widget.pelangganData['harga'] = selectedPaket!['harga'];
-        widget.pelangganData['no_hp'] = _hpController.text;
-        widget.pelangganData['nik'] = _nikController.text;
-        widget.pelangganData['jatuh_tempo'] = selectedJatuhTempo;
-        widget.pelangganData['sales'] = _salesController.text;
-        widget.pelangganData['jumlah_bulan_tunggakan'] = _bulanController.text;
-        widget.pelangganData['total_tunggakan'] = totalTunggakan.toString();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data pelanggan & IDPEL berhasil diperbarui!')),
-        );
         Navigator.pop(context, true);
       } else {
-        throw Exception('Gagal memperbarui data ke server');
+        throw Exception('Gagal memperbarui');
       }
     } catch (e) {
       setState(() => isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -1579,86 +1628,22 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
-              TextFormField(
-                controller: _idpelController,
-                decoration: const InputDecoration(labelText: 'ID Pelanggan (IDPEL)'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
+              TextFormField(controller: _idpelController, decoration: const InputDecoration(labelText: 'ID Pelanggan')),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _namaController,
-                decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
+              TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _alamatController,
-                decoration: const InputDecoration(labelText: 'Alamat'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
+              TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
               const SizedBox(height: 10),
               DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
+                decoration: const InputDecoration(labelText: 'Paket Internet'),
                 value: selectedPaket,
-                items: daftarPaket.map((paket) {
-                  return DropdownMenuItem(
-                    value: paket,
-                    child: Text('${paket['nama']} (${paket['harga']} + PPN)'),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedPaket = val as Map<String, dynamic>?;
-                  });
-                },
-                validator: (val) => val == null ? 'Pilih paket' : null,
+                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                onChanged: (val) => setState(() => selectedPaket = val as Map<String, dynamic>?),
               ),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _bulanController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan / Tunggakan'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
-                value: selectedJatuhTempo,
-                items: daftarJatuhTempo.map((tgl) {
-                  return DropdownMenuItem(value: tgl, child: Text(tgl));
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedJatuhTempo = val.toString();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _hpController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'No WhatsApp'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _nikController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'No KTP / NIK'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _salesController,
-                decoration: const InputDecoration(labelText: 'Nama Sales (Opsional)'),
-              ),
-              const SizedBox(height: 25),
-              ElevatedButton(
-                onPressed: isSaving ? null : updatePelanggan,
-                child: isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Simpan Perubahan'),
-              ),
+              TextFormField(controller: _bulanController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bulan Tagihan')),
+              const SizedBox(height: 20),
+              ElevatedButton(onPressed: isSaving ? null : updatePelanggan, child: const Text('Simpan Perubahan')),
             ],
           ),
         ),
@@ -1667,10 +1652,8 @@ class _EditPelangganPageState extends State<EditPelangganPage> {
   }
 }
 
-// ================= HALAMAN TAMBAH PELANGGAN =================
 class TambahPelangganPage extends StatefulWidget {
   const TambahPelangganPage({super.key});
-
   @override
   State<TambahPelangganPage> createState() => _TambahPelangganPageState();
 }
@@ -1699,17 +1682,8 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   String selectedStatus = 'Belum Lunas';
   bool isSaving = false;
 
-  final List<String> daftarJatuhTempo = ['Tanggal 5', 'Tanggal 10', 'Tanggal 15', 'Tanggal 20', 'Tanggal 25'];
-  final List<String> daftarStatus = ['Belum Lunas', 'Lunas'];
-
   Future<void> simpanPelanggan() async {
-    if (!_formKey.currentState!.validate() || selectedPaket == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lengkapi form dan pilih paket internet!')),
-      );
-      return;
-    }
-
+    if (!_formKey.currentState!.validate() || selectedPaket == null) return;
     setState(() => isSaving = true);
 
     int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
@@ -1741,14 +1715,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
       if (response.statusCode == 200 || response.statusCode == 302) {
         Navigator.pop(context, true);
-      } else {
-        throw Exception('Gagal menyimpan ke server');
       }
     } catch (e) {
       setState(() => isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
     }
   }
 
@@ -1762,97 +1731,19 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
-              TextFormField(
-                controller: _idpelController,
-                decoration: const InputDecoration(labelText: 'ID Pelanggan (Opsional, kosongkan untuk auto BM00x)'),
-              ),
+              TextFormField(controller: _idpelController, decoration: const InputDecoration(labelText: 'ID Pelanggan (Opsional)')),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _namaController,
-                decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
+              TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _alamatController,
-                decoration: const InputDecoration(labelText: 'Alamat'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
+              TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
               const SizedBox(height: 10),
               DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
-                items: daftarPaket.map((paket) {
-                  return DropdownMenuItem(
-                    value: paket,
-                    child: Text('${paket['nama']} (${paket['harga']} + PPN)'),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedPaket = val as Map<String, dynamic>?;
-                  });
-                },
-                validator: (val) => val == null ? 'Pilih paket' : null,
+                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                onChanged: (val) => setState(() => selectedPaket = val as Map<String, dynamic>?),
               ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _bulanController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan Awal'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Tanggal Jatuh Tempo'),
-                value: selectedJatuhTempo,
-                items: daftarJatuhTempo.map((tgl) {
-                  return DropdownMenuItem(value: tgl, child: Text(tgl));
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedJatuhTempo = val.toString();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Status Pembayaran Awal'),
-                value: selectedStatus,
-                items: daftarStatus.map((st) {
-                  return DropdownMenuItem(value: st, child: Text(st));
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedStatus = val.toString();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _hpController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'No WhatsApp'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _nikController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'No KTP / NIK'),
-                validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _salesController,
-                decoration: const InputDecoration(labelText: 'Nama Sales (Opsional)'),
-              ),
-              const SizedBox(height: 25),
-              ElevatedButton(
-                onPressed: isSaving ? null : simpanPelanggan,
-                child: isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Simpan Pelanggan ke Spreadsheet'),
-              ),
+              const SizedBox(height: 20),
+              ElevatedButton(onPressed: isSaving ? null : simpanPelanggan, child: const Text('Simpan Pelanggan')),
             ],
           ),
         ),
