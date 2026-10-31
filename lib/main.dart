@@ -170,10 +170,10 @@ class BillingHomePage extends StatelessWidget {
                   children: [
                     Text('Total Tagihan (${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan): Rp ${item['total_tunggakan']}'),
                     const SizedBox(height: 15),
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
                       value: selectedMetode,
-                      items: metodeList.map((m) => DropdownMenuItem<String>(value: m, child: Text(m))).toList(),
+                      items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                       onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
                     ),
                     const SizedBox(height: 15),
@@ -325,7 +325,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _dropcoreController = TextEditingController(text: '0');
   final TextEditingController _patchcoreController = TextEditingController(text: '0');
   
-  String? selectedOnt;
+  var selectedOnt;
   String selectedJatuhTempo = 'Tanggal 5';
   bool isSaving = false;
 
@@ -336,7 +336,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
     {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
   ];
 
-  Map<String, dynamic>? selectedPaket;
+  var selectedPaket;
 
   @override
   Widget build(BuildContext context) {
@@ -358,9 +358,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               TextFormField(controller: _hpController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'No WhatsApp')),
               
               const SizedBox(height: 15),
-              DropdownButtonFormField>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
-                items: daftarPaket.map((p) => DropdownMenuItem>(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaket = val),
               ),
 
@@ -370,12 +370,12 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi yang Bertugas (Cth: Budi / Joko)')),
               
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Pilih Perangkat ONT yang Dipasang'),
                 value: selectedOnt,
                 items: ontList.isEmpty 
-                    ? [const DropdownMenuItem<String>(value: null, child: Text('Stok ONT Kosong'))]
-                    : ontList.map((o) => DropdownMenuItem<String>(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
+                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
+                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
                 onChanged: (val) => setState(() => selectedOnt = val),
               ),
 
@@ -489,7 +489,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   late TextEditingController _teknisiController;
 
   String selectedStatus = 'Belum Lunas';
-  String? selectedOntBaru;
+  var selectedOntBaru;
   bool isSaving = false;
 
   var daftarPaket = [
@@ -499,7 +499,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
     {'nama': '25 Mbps', 'harga': 'Rp 200.000'},
   ];
 
-  Map<String, dynamic>? selectedPaketBaru;
+  var selectedPaketBaru;
 
   @override
   void initState() {
@@ -541,10 +541,10 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               TextFormField(controller: _hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
               
               const SizedBox(height: 15),
-              DropdownButtonFormField>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Ganti Paket Internet (Upgrade/Downgrade)'),
                 value: selectedPaketBaru,
-                items: daftarPaket.map((p) => DropdownMenuItem>(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaketBaru = val),
               ),
 
@@ -553,10 +553,10 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan'),
               ),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Status Tagihan'),
                 value: selectedStatus,
-                items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem<String>(value: s, child: Text(s))).toList(),
+                items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                 onChanged: (val) => setState(() => selectedStatus = val.toString()),
               ),
 
@@ -564,12 +564,12 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               const Text('Penanganan Gangguan & Perangkat', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orangeAccent, fontSize: 15)),
               const Divider(),
               
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Penggantian ONT Baru (Opsional jika rusak)'),
                 value: selectedOntBaru,
                 items: ontList.isEmpty 
-                    ? [const DropdownMenuItem<String>(value: null, child: Text('Stok ONT Kosong'))]
-                    : ontList.map((o) => DropdownMenuItem<String>(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
+                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
+                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
                 onChanged: (val) => setState(() => selectedOntBaru = val),
               ),
 
@@ -685,10 +685,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
-                      items: kategoriList.map((kat) => DropdownMenuItem<String>(value: kat, child: Text(kat))).toList(),
+                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
