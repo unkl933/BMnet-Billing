@@ -585,7 +585,12 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    List ontList = widget.stokList.where((s) => (s['kategori'] ?? '').toString().toLowerCase().contains('ont')).toList();
+    // PERBAIKAN: Memeriksa kategori DAN nama_barang agar ONT dari Belanja Aset ikut terpanggil
+    List ontList = widget.stokList.where((s) {
+      final kat = (s['kategori'] ?? '').toString().toLowerCase();
+      final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
+      return kat.contains('ont') || nama.contains('ont');
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Tambah Pelanggan & Pasang Baru')),
@@ -754,7 +759,12 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    List ontList = widget.stokList.where((s) => (s['kategori'] ?? '').toString().toLowerCase().contains('ont')).toList();
+    // PERBAIKAN: Memeriksa kategori DAN nama_barang agar ONT dari Belanja Aset ikut terpanggil
+    List ontList = widget.stokList.where((s) {
+      final kat = (s['kategori'] ?? '').toString().toLowerCase();
+      final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
+      return kat.contains('ont') || nama.contains('ont');
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text('Upgrade & Perbaikan: ${widget.pelangganItem['nama']}')),
