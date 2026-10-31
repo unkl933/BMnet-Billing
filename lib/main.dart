@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -95,7 +94,118 @@ class BillingHomePage extends StatelessWidget {
 
   const BillingHomePage({super.key, required this.pelanggan, required this.stok, required this.isLoading, required this.onRefresh});
 
+  // Fungsi Generate & Share PDF Struk/Nota langsung ke WhatsApp
+  Future<void> _sharePdfNotaWa(Map item, bool isLunas) async {
+    final pdf = pw.Document();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('BMnet ISP', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                    ],
+                  ),
+                  pw.Text(isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.red800)),
+                ],
+              ),
+              pw.SizedBox(height: 15),
+              pw.Divider(thickness: 1.5, color: PdfColors.blue800),
+              pw.SizedBox(height: 10),
+
+              pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 5),
+              pw.Text('ID Pelanggan : ${item['idpel'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Nama         : ${item['nama'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Alamat       : ${item['alamat'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('No WhatsApp  : ${item['no_hp'] ?? '-'}', style: const pw.TextStyle(fontSize: 10)),
+              
+              pw.SizedBox(height: 15),
+              pw.Text('RINCIAN PEMBAYARAN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.SizedBox(height: 5),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Deskripsi Layanan', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Periode', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Paket Internet ${item['paket']}', style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan', style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Rp ${item['total_tunggakan']}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                ],
+              ),
+              
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Status: ${isLunas ? "LUNAS" : "BELUM LUNAS"}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green : PdfColors.red)),
+                      if (isLunas) ...[
+                        pw.Text('Metode: ${item['metode_pembayaran'] ?? "-"}', style: const pw.TextStyle(fontSize: 9)),
+                        pw.Text('Petugas: ${item['petugas_penerima'] ?? "Admin BMnet"}', style: const pw.TextStyle(fontSize: 9)),
+                      ]
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('TOTAL: Rp ${item['total_tunggakan']}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 30),
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text('Terima kasih telah menggunakan layanan BMnet ISP', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    try {
+      final output = await getTemporaryDirectory();
+      final file = File("${output.path}/${isLunas ? 'Kwitansi_Pelunasan' : 'Nota_Tagihan'}_${item['idpel']}.pdf");
+      await file.writeAsBytes(await pdf.save());
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: isLunas 
+            ? "Berikut adalah Kwitansi Pelunasan Resmi internet BMnet untuk ${item['nama']}. Terima kasih!" 
+            : "Berikut adalah Nota Tagihan internet BMnet untuk ${item['nama']}. Silakan lakukan pembayaran sebelum jatuh tempo.",
+      );
+    } catch (e) {
+      // Handle error
+    }
+  }
+
   void _showPelangganDetailDialog(BuildContext context, Map item) {
+    bool isLunas = (item['status'] ?? '').toString().toLowerCase() == 'lunas';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -110,19 +220,23 @@ class BillingHomePage extends StatelessWidget {
               Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
-              Text('Material     : ${item['material_terpakai'] ?? '-'}'),
-              Text('SN ONT       : ${item['sn_ont'] ?? '-'}'),
-              Text('Gangguan     : ${item['jenis_gangguan'] ?? '-'}'),
-              Text('Bulan Tagih  : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
+              Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
+              Text('Petugas/Kasir: ${item['petugas_penerima'] ?? '-'}'),
               const Divider(),
-              Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: (item['status'] == 'Lunas') ? Colors.green : Colors.red)),
+              Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: isLunas ? Colors.green : Colors.red)),
               Text('Total Tagihan: Rp ${item['total_tunggakan'] ?? '0'}'),
               Text('Metode Bayar : ${item['metode_pembayaran'] ?? '-'}'),
             ],
           ),
         ),
         actions: [
-          if ((item['status'] ?? '').toString().toLowerCase() != 'lunas')
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.teal),
+            onPressed: () => _sharePdfNotaWa(item, isLunas),
+            icon: const Icon(Icons.picture_as_pdf, size: 16),
+            label: Text(isLunas ? 'Kirim Struk PDF' : 'Kirim Nota PDF'),
+          ),
+          if (!isLunas)
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
               onPressed: () {
@@ -141,7 +255,7 @@ class BillingHomePage extends StatelessWidget {
               ).then((res) => { if (res == true) onRefresh() });
             },
             icon: const Icon(Icons.upgrade, size: 16),
-            label: const Text('Upgrade & Perbaikan'),
+            label: const Text('Upgrade'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -154,6 +268,7 @@ class BillingHomePage extends StatelessWidget {
 
   void _showBayarDialog(BuildContext context, Map item) {
     String selectedMetode = 'Tunai';
+    final TextEditingController petugasController = TextEditingController(text: 'Admin BMnet');
     final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS', 'DANA', 'GoPay', 'ShopeePay', 'OVO'];
 
     showDialog(
@@ -169,6 +284,11 @@ class BillingHomePage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total Tagihan (${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan): Rp ${item['total_tunggakan']}'),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: petugasController,
+                      decoration: const InputDecoration(labelText: 'Nama Petugas / Kasir Penerima'),
+                    ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField(
                       decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
@@ -194,12 +314,11 @@ class BillingHomePage extends StatelessWidget {
                       Center(
                         child: Image.asset(
                           'assets/images/qris.png',
-                          height: 180,
-                          width: 180,
+                          height: 160,
+                          width: 160,
                           errorBuilder: (context, error, stackTrace) => const Text(
-                            'Gambar QRIS tidak ditemukan di assets/images/qris.png',
+                            'QRIS Image not found in assets/images/qris.png',
                             style: TextStyle(color: Colors.red, fontSize: 10),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
@@ -219,6 +338,7 @@ class BillingHomePage extends StatelessWidget {
                       "action": "bayar_pelanggan",
                       "idpel": item['idpel'],
                       "metode_pembayaran": selectedMetode,
+                      "petugas_penerima": petugasController.text,
                       "total_tunggakan": item['total_tunggakan'],
                       "status": "Lunas"
                     };
@@ -255,6 +375,7 @@ class BillingHomePage extends StatelessWidget {
               itemCount: pelanggan.length,
               itemBuilder: (context, index) {
                 final item = pelanggan[index];
+                bool isLunas = (item['status'] ?? '').toString().toLowerCase() == 'lunas';
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
@@ -262,7 +383,11 @@ class BillingHomePage extends StatelessWidget {
                     title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTagihan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bln (Rp ${item['total_tunggakan'] ?? '0'})\nStatus: ${item['status'] ?? 'Belum Lunas'}'),
                     isThreeLine: true,
-                    trailing: Text(item['status'] ?? 'Belum Lunas', style: TextStyle(color: (item['status'] == 'Lunas') ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.picture_as_pdf, color: Colors.teal),
+                      onPressed: () => _sharePdfNotaWa(item, isLunas),
+                      tooltip: 'Kirim PDF via WhatsApp',
+                    ),
                   ),
                 );
               },
@@ -303,7 +428,6 @@ class ContainerInfoBayar extends StatelessWidget {
   }
 }
 
-// ================= HALAMAN TAMBAH PELANGGAN & POTONG STOK =================
 class TambahPelangganPage extends StatefulWidget {
   final List stokList;
   const TambahPelangganPage({super.key, required this.stokList});
@@ -321,6 +445,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   final TextEditingController _nikController = TextEditingController();
   final TextEditingController _salesController = TextEditingController();
   final TextEditingController _teknisiController = TextEditingController();
+  final TextEditingController _bulanTunggakanController = TextEditingController(text: '1');
   
   final TextEditingController _dropcoreController = TextEditingController(text: '0');
   final TextEditingController _patchcoreController = TextEditingController(text: '0');
@@ -363,11 +488,16 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                 items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaket = val),
               ),
+              TextFormField(
+                controller: _bulanTunggakanController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan / Tunggakan Awal'),
+              ),
 
               const SizedBox(height: 20),
               const Text('Instalasi & Teknisi Lapangan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
               const Divider(),
-              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi yang Bertugas (Cth: Budi / Joko)')),
+              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi yang Bertugas')),
               
               const SizedBox(height: 10),
               DropdownButtonFormField(
@@ -382,21 +512,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _dropcoreController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Kabel Dropcore (Meter)'),
-                    ),
-                  ),
+                  Expanded(child: TextFormField(controller: _dropcoreController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kabel Dropcore (Meter)'))),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _patchcoreController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Patchcore (Pcs)'),
-                    ),
-                  ),
+                  Expanded(child: TextFormField(controller: _patchcoreController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Patchcore (Pcs)'))),
                 ],
               ),
 
@@ -408,7 +526,8 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   setState(() => isSaving = true);
 
                   int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
-                  int totalTunggakan = (hargaInt * 1.11).round();
+                  int jmlBulan = int.tryParse(_bulanTunggakanController.text) ?? 1;
+                  int totalTunggakan = (hargaInt * jmlBulan * 1.11).round();
 
                   List materialPakai = [];
                   if (selectedOnt != null) {
@@ -438,7 +557,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                     "sales": _salesController.text,
                     "teknisi": _teknisiController.text.isEmpty ? "Tim Teknisi" : _teknisiController.text,
                     "material_terpakai": materialStr,
-                    "jumlah_bulan_tunggakan": "1",
+                    "jumlah_bulan_tunggakan": jmlBulan.toString(),
                     "total_tunggakan": totalTunggakan.toString(),
                     "sisa_tunggakan": totalTunggakan.toString(),
                     "pemakaian_material": materialPakai,
@@ -468,7 +587,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
   }
 }
 
-// ================= HALAMAN UPGRADE DATA & PENANGANAN GANGGUAN =================
 class UpgradePelangganPage extends StatefulWidget {
   final Map pelangganItem;
   final List stokList;
@@ -534,7 +652,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
-              const Text('Informasi & Ganti Paket', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 15)),
+              const Text('Informasi & Ganti Paket / Tunggakan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 15)),
               const Divider(),
               TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
               TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
@@ -542,7 +660,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               
               const SizedBox(height: 15),
               DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Ganti Paket Internet (Upgrade/Downgrade)'),
+                decoration: const InputDecoration(labelText: 'Ganti Paket Internet'),
                 value: selectedPaketBaru,
                 items: daftarPaket.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
                 onChanged: (val) => setState(() => selectedPaketBaru = val),
@@ -551,7 +669,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               TextFormField(
                 controller: _bulanController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan'),
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tunggakan / Tagihan'),
               ),
               DropdownButtonFormField(
                 decoration: const InputDecoration(labelText: 'Status Tagihan'),
@@ -565,7 +683,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
               const Divider(),
               
               DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Penggantian ONT Baru (Opsional jika rusak)'),
+                decoration: const InputDecoration(labelText: 'Penggantian ONT Baru (Opsional)'),
                 value: selectedOntBaru,
                 items: ontList.isEmpty 
                     ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
@@ -573,18 +691,9 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                 onChanged: (val) => setState(() => selectedOntBaru = val),
               ),
 
-              TextFormField(
-                controller: _snOntController,
-                decoration: const InputDecoration(labelText: 'Serial Number (SN) ONT'),
-              ),
-              TextFormField(
-                controller: _gangguanController,
-                decoration: const InputDecoration(labelText: 'Jenis Gangguan yang Diperbaiki (Cth: Redaman Tinggi / Mati Total)'),
-              ),
-              TextFormField(
-                controller: _teknisiController,
-                decoration: const InputDecoration(labelText: 'Nama Teknisi yang Memperbaiki'),
-              ),
+              TextFormField(controller: _snOntController, decoration: const InputDecoration(labelText: 'Serial Number (SN) ONT')),
+              TextFormField(controller: _gangguanController, decoration: const InputDecoration(labelText: 'Jenis Gangguan (Cth: Redaman Tinggi / Los)')),
+              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi Perbaikan')),
 
               const SizedBox(height: 30),
               ElevatedButton.icon(
@@ -643,7 +752,6 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   }
 }
 
-// ================= TAB 2: HALAMAN PENGELUARAN =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
@@ -692,10 +800,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: keteranganController,
-                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama Perangkat / Barang Aset' : 'Keterangan'),
-                    ),
+                    TextField(controller: keteranganController, decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama Perangkat / Aset' : 'Keterangan')),
                     const SizedBox(height: 10),
                     TextField(controller: nominalController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Nominal (Rp)')),
                     
@@ -781,7 +886,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   }
 }
 
-// ================= TAB 3: HALAMAN STOK BARANG =================
 class StokBarangPage extends StatelessWidget {
   final List stok;
   final bool isLoading;
@@ -816,7 +920,6 @@ class StokBarangPage extends StatelessWidget {
   }
 }
 
-// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN =================
 class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
@@ -841,7 +944,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
   Future<void> _cetakLaporanPdf() async {
     final pdf = pw.Document();
     int totalLunas = 0;
-    int totalTunggakan = 0;
+    int totalPotensiTunggakan = 0;
     int totalPengeluaran = 0;
 
     Map<String, int> rekapKategoriPengeluaran = {};
@@ -852,7 +955,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
       if (status == 'lunas') {
         totalLunas += total;
       } else {
-        totalTunggakan += total;
+        totalPotensiTunggakan += total;
       }
     }
 
@@ -878,8 +981,8 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('BMnet ISP - LAPORAN KEUANGAN & LABA RUGI', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.Text('Periode: $selectedPeriode (${now.year}) | Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+              pw.Text('BMnet ISP - REKAP KEUANGAN & LABA RUGI BULANAN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Text('Periode: $selectedPeriode (${now.year}) | Tanggal Cetak: $tglCetak', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
               pw.SizedBox(height: 10),
               pw.Divider(thickness: 1.5, color: PdfColors.blue800),
               pw.SizedBox(height: 10),
@@ -894,8 +997,22 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text('PEMASUKAN (LUNAS)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
-                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Rp $totalLunas', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                           pw.Text('PPN 11%: Rp $ppnLunas', style: const pw.TextStyle(fontSize: 7)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 5),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.orange300), color: PdfColors.orange50),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('TOTAL TUNGGAKAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800)),
+                          pw.Text('Rp $totalPotensiTunggakan', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -908,8 +1025,8 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('TOTAL PENGELUARAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
-                          pw.Text('Rp $totalPengeluaran', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('PENGELUARAN', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+                          pw.Text('Rp $totalPengeluaran', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -926,7 +1043,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Kategori Pengeluaran', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Kategori', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
                       pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Nominal', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
                     ],
                   ),
@@ -948,27 +1065,26 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Laporan_Keuangan_Pengeluaran_BMnet.pdf',
+      name: 'Rekap_Keuangan_Bulanan_BMnet.pdf',
     );
   }
 
   @override
   Widget build(BuildContext context) {
     int totalPemasukanLunas = 0;
+    int totalTunggakanPelanggan = 0;
     int totalPengeluaran = 0;
-    Map<String, int> rekapKategoriPengeluaran = {};
 
     for (var item in widget.pelanggan) {
       if ((item['status'] ?? '').toString().toLowerCase() == 'lunas') {
         totalPemasukanLunas += _parseNominal(item['total_tunggakan']);
+      } else {
+        totalTunggakanPelanggan += _parseNominal(item['total_tunggakan']);
       }
     }
 
     for (var item in widget.pengeluaran) {
-      final nominal = _parseNominal(item['nominal']);
-      final kategori = (item['kategori'] ?? 'Operasional').toString();
-      totalPengeluaran += nominal;
-      rekapKategoriPengeluaran[kategori] = (rekapKategoriPengeluaran[kategori] ?? 0) + nominal;
+      totalPengeluaran += _parseNominal(item['nominal']);
     }
 
     final int labaBersih = totalPemasukanLunas - totalPengeluaran;
@@ -983,7 +1099,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Periode Laporan:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Periode Rekap:', style: TextStyle(fontWeight: FontWeight.bold)),
                     ToggleButtons(
                       isSelected: [selectedPeriode == 'Bulanan', selectedPeriode == 'Tahunan'],
                       onPressed: (index) => setState(() => selectedPeriode = index == 0 ? 'Bulanan' : 'Tahunan'),
@@ -998,7 +1114,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
                   onPressed: _cetakLaporanPdf,
                   icon: const Icon(Icons.print),
-                  label: Text('Cetak Laporan $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text('Cetak Rekap $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 15),
                 Card(
@@ -1008,6 +1124,8 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
+                        const SizedBox(height: 8),
+                        Text('Total Piutang/Tunggakan: Rp $totalTunggakanPelanggan', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange)),
                         const SizedBox(height: 8),
                         Text('Total Pengeluaran: Rp $totalPengeluaran', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red)),
                         const Divider(),
