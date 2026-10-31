@@ -18,7 +18,7 @@ void main() {
   ));
 }
 
-// ================= NAVIGASI UTAMA (TAB BAR) =================
+// ================= NAVIGASI UTAMA =================
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -29,7 +29,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   List pelangganData = [];
-  List pengeluaranData = []; // Data Pengeluaran
+  List pengeluaranData = [];
   bool isLoading = true;
 
   @override
@@ -44,13 +44,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       final response = await http.get(Uri.parse(scriptUrl));
       if (response.statusCode == 200 || response.statusCode == 302) {
         final decoded = json.decode(response.body);
-        // Mendukung jika backend mengirim map gabungan atau list pelanggan
         setState(() {
           if (decoded is Map) {
             pelangganData = decoded['pelanggan'] ?? [];
             pengeluaranData = decoded['pengeluaran'] ?? [];
-          } else {
+          } else if (decoded is List) {
             pelangganData = decoded;
+            pengeluaranData = [];
           }
           isLoading = false;
         });
@@ -113,7 +113,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ================= HALAMAN PENGELUARAN =================
+// ================= HALAMAN PENGELUARAN (FIXED STATE & FORM) =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
@@ -135,6 +135,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController keteranganController = TextEditingController();
     final TextEditingController nominalController = TextEditingController();
     String selectedKategori = 'Operasional';
+    bool isSaving = false;
 
     final List<String> kategoriList = [
       'Belanja Aset',
@@ -184,39 +185,61 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
                   child: const Text('Batal'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    final payload = {
-                      "action": "tambah_pengeluaran",
-                      "kategori": selectedKategori,
-                      "keterangan": keteranganController.text,
-                      "nominal": nominalController.text,
-                      "tanggal": DateTime.now().toString().split(' ')[0],
-                    };
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (nominalController.text.isEmpty || keteranganController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Lengkapi form pengeluaran terlebih dahulu!')),
+                            );
+                            return;
+                          }
 
-                    Navigator.pop(context);
-                    try {
-                      final response = await http.post(
-                        Uri.parse(scriptUrl),
-                        headers: {"Content-Type": "application/json"},
-                        body: json.encode(payload),
-                      );
-                      if (response.statusCode == 200 || response.statusCode == 302) {
-                        widget.onRefresh();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Pengeluaran berhasil dicatat!')),
-                        );
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Gagal menyimpan pengeluaran: $e')),
-                      );
-                    }
-                  },
-                  child: const Text('Simpan'),
+                          setDialogState(() => isSaving = true);
+
+                          final todayStr = DateTime.now().toString().split(' ')[0];
+                          final payload = {
+                            "action": "tambah_pengeluaran",
+                            "kategori": selectedKategori,
+                            "keterangan": keteranganController.text,
+                            "nominal": nominalController.text,
+                            "tanggal": todayStr,
+                          };
+
+                          try {
+                            final response = await http.post(
+                              Uri.parse(scriptUrl),
+                              headers: {"Content-Type": "application/json"},
+                              body: json.encode(payload),
+                            );
+
+                            if (response.statusCode == 200 || response.statusCode == 302) {
+                              Navigator.pop(context);
+                              await widget.onRefresh(); // Refresh data dari server
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Pengeluaran berhasil dicatat!')),
+                                );
+                              }
+                            } else {
+                              throw Exception('Respon server gagal');
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Gagal menyimpan pengeluaran: $e')),
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Simpan'),
                 ),
               ],
             );
@@ -230,7 +253,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manajemen Pengeluaran'),
+        title: Text('Pengeluaran (${widget.pengeluaran.length} Catatan)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -249,12 +272,19 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
-                        leading: const Icon(Icons.money_off, color: Colors.red),
-                        title: Text(item['keterangan'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.redAccent,
+                          child: Icon(Icons.money_off, color: Colors.white),
+                        ),
+                        title: Text(
+                          item['keterangan']?.toString() ?? '-',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTanggal: ${item['tanggal'] ?? '-'}'),
+                        isThreeLine: true,
                         trailing: Text(
                           'Rp ${item['nominal'] ?? '0'}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
                         ),
                       ),
                     );
@@ -268,189 +298,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   }
 }
 
-// ================= HALAMAN DAFTAR PELANGGAN =================
-class BillingHomePage extends StatefulWidget {
-  final List pelanggan;
-  final bool isLoading;
-  final Future<void> Function() onRefresh;
-
-  const BillingHomePage({
-    super.key,
-    required this.pelanggan,
-    required this.isLoading,
-    required this.onRefresh,
-  });
-
-  @override
-  State<BillingHomePage> createState() => _BillingHomePageState();
-}
-
-class _BillingHomePageState extends State<BillingHomePage> {
-  List filteredPelanggan = [];
-  String searchQuery = '';
-  String sortBy = 'default';
-
-  @override
-  void initState() {
-    super.initState();
-    _applyFilterAndSort();
-  }
-
-  @override
-  void didUpdateWidget(covariant BillingHomePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _applyFilterAndSort();
-  }
-
-  void _applyFilterAndSort() {
-    List temp = List.from(widget.pelanggan);
-
-    if (searchQuery.isNotEmpty) {
-      temp = temp.where((item) {
-        final nama = (item['nama'] ?? '').toString().toLowerCase();
-        return nama.contains(searchQuery.toLowerCase());
-      }).toList();
-    }
-
-    if (sortBy == 'alamat') {
-      temp.sort((a, b) => (a['alamat'] ?? '').toString().compareTo((b['alamat'] ?? '').toString()));
-    } else if (sortBy == 'paket') {
-      temp.sort((a, b) => (a['paket'] ?? '').toString().compareTo((b['paket'] ?? '').toString()));
-    } else if (sortBy == 'nama') {
-      temp.sort((a, b) => (a['nama'] ?? '').toString().compareTo((b['nama'] ?? '').toString()));
-    } else if (sortBy == 'lunas') {
-      temp = temp.where((item) => (item['status'] ?? 'Belum Lunas').toString().toLowerCase() == 'lunas').toList();
-    } else if (sortBy == 'belum_lunas') {
-      temp = temp.where((item) => (item['status'] ?? 'Belum Lunas').toString().toLowerCase() != 'lunas').toList();
-    }
-
-    setState(() {
-      filteredPelanggan = temp;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Billing Mini ISP (${filteredPelanggan.length} Pelanggan)'),
-        actions: [
-          PopupMenuButton(
-            icon: const Icon(Icons.sort),
-            onSelected: (value) {
-              setState(() {
-                sortBy = value.toString();
-                _applyFilterAndSort();
-              });
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'default', child: Text('Urutan Default')),
-              const PopupMenuItem(value: 'nama', child: Text('Urutkan Nama')),
-              const PopupMenuItem(value: 'alamat', child: Text('Urutkan Alamat')),
-              const PopupMenuItem(value: 'paket', child: Text('Urutkan Paket')),
-              const PopupMenuItem(value: 'lunas', child: Text('Filter: Sudah Lunas')),
-              const PopupMenuItem(value: 'belum_lunas', child: Text('Filter: Belum Lunas')),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: widget.onRefresh,
-          )
-        ],
-      ),
-      body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Cari Nama Pelanggan...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                    ),
-                    onChanged: (value) {
-                      searchQuery = value;
-                      _applyFilterAndSort();
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: filteredPelanggan.isEmpty
-                      ? const Center(child: Text('Data pelanggan tidak ditemukan.'))
-                      : ListView.builder(
-                          itemCount: filteredPelanggan.length,
-                          itemBuilder: (context, index) {
-                            final item = filteredPelanggan[index];
-                            final status = (item['status'] ?? 'Belum Lunas').toString();
-                            final isLunas = status.toLowerCase() == 'lunas';
-
-                            return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text('${item['no'] ?? index + 1}'),
-                                ),
-                                title: Text(
-                                  (item['nama'] ?? '').toString(), 
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket'] ?? '-'}\nTunggakan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan (Rp ${item['total_tunggakan'] ?? '0'} incl. PPN 11%)'),
-                                isThreeLine: true,
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      color: isLunas ? Colors.green.shade800 : Colors.red.shade800,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                onTap: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => DetailPelangganPage(pelangganData: item),
-                                    ),
-                                  );
-                                  if (result == true) {
-                                    widget.onRefresh();
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TambahPelangganPage()),
-          );
-          if (result == true) {
-            widget.onRefresh();
-          }
-        },
-      ),
-    );
-  }
-}
-
-// ================= DASHBOARD KEUANGAN & LAPORAN + PENGELUARAN =================
+// ================= DASHBOARD KEUANGAN =================
 class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
@@ -470,7 +318,7 @@ class DashboardKeuanganPage extends StatefulWidget {
 }
 
 class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
-  String selectedPeriode = 'Bulanan'; // Bulanan / Tahunan
+  String selectedPeriode = 'Bulanan';
 
   int _parseNominal(dynamic val) {
     if (val == null) return 0;
@@ -505,7 +353,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
 
     final int dppLunas = (totalLunas / 1.11).round();
     final int ppnLunas = totalLunas - dppLunas;
-    final int labaBersih = totalLunas - totalPengeluNaranIfNeeded(totalPengeluaran);
+    final int labaBersih = totalLunas - totalPengeluaran;
 
     final now = DateTime.now();
     final tglCetak = "${now.day}/${now.month}/${now.year}";
@@ -524,7 +372,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
               pw.Divider(thickness: 1.5, color: PdfColors.blue800),
               pw.SizedBox(height: 10),
 
-              // RINGKASAN
               pw.Row(
                 children: [
                   pw.Expanded(
@@ -593,8 +440,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     );
   }
 
-  int totalPengeluNaranIfNeeded(int val) => val;
-
   @override
   Widget build(BuildContext context) {
     int totalPemasukanLunas = 0;
@@ -625,10 +470,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     }
 
     final int labaBersih = totalPemasukanLunas - totalPengeluaran;
-    final int dppLunas = (totalPemasukanLunas / 1.11).round();
-    final int ppnLunas = totalPemasukanLunas - dppLunas;
-    final totalSemuaPelanggan = widget.pelanggan.length;
-    final rasioLunas = totalSemuaPelanggan > 0 ? (totalPelangganLunas / totalSemuaPelanggan) : 0.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -680,7 +521,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   ),
                   const SizedBox(height: 15),
 
-                  // KARTU KEUANGAN UTAMA
                   Row(
                     children: [
                       Expanded(
@@ -720,7 +560,6 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   ),
                   const SizedBox(height: 15),
 
-                  // REKAP PENGELUARAN PER KATEGORI
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -786,7 +625,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
   }
 }
 
-// ================= HALAMAN DETAIL, EDIT, TAMBAH PELANGGAN =================
+// ================= HALAMAN DAFTAR PELANGGAN / EDIT / DETAIL =================
 class DetailPelangganPage extends StatefulWidget {
   final Map<String, dynamic> pelangganData;
   const DetailPelangganPage({super.key, required this.pelangganData});
