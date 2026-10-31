@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
@@ -96,6 +97,16 @@ class BillingHomePage extends StatelessWidget {
 
   Future<void> _sharePdfNotaWa(Map item, bool isLunas) async {
     final pdf = pw.Document();
+    
+    // Muat logo dari asset untuk PDF
+    pw.MemoryImage? logoImage;
+    try {
+      final ByteData bytes = await rootBundle.load('assets/images/logo.png');
+      logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (e) {
+      logoImage = null;
+    }
+
     final now = DateTime.now();
     final tanggalCetak = "${now.day}/${now.month}/${now.year}";
     final noRef = isLunas ? "KW/BM/${now.year}/${now.month}/${item['idpel'] ?? '891'}" : "INV/BM/${now.year}/${now.month}/${item['idpel'] ?? '042'}";
@@ -109,172 +120,187 @@ class BillingHomePage extends StatelessWidget {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+          return pw.Stack(
             children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              // Watermark Profesional di Latar Belakang
+              if (logoImage != null)
+                pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.08,
+                    child: pw.Image(logoImage, width: 300, height: 300),
+                  ),
+                ),
+              
+              // Konten Utama Nota / Kwitansi
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Container(
-                        width: 35,
-                        height: 35,
-                        decoration: const pw.BoxDecoration(color: PdfColors.blue800, shape: pw.BoxShape.circle),
-                        child: pw.Center(
-                          child: pw.Text('BN', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 12)),
-                        ),
-                      ),
-                      pw.SizedBox(width: 10),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      pw.Row(
                         children: [
-                          pw.Text('BM Network', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                          pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                          pw.Text('Jl. Utama Networking No. 88 | WA: 0812-3456-7890', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                          if (logoImage != null)
+                            pw.Image(logoImage, width: 40, height: 40)
+                          else
+                            pw.Container(
+                              width: 40,
+                              height: 40,
+                              decoration: const pw.BoxDecoration(color: PdfColors.blue800, shape: pw.BoxShape.circle),
+                              child: pw.Center(child: pw.Text('BN', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                            ),
+                          pw.SizedBox(width: 10),
+                          pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('BM Network', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                              pw.Text('Layanan Internet Cepat & Terpercaya', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                              pw.Text('Jl. Utama Networking No. 88 | WA: 0812-3456-7890', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.blue800)),
+                          pw.SizedBox(height: 2),
+                          pw.Text('No: $noRef', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('Tanggal: $tanggalCetak', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
                         ],
                       ),
                     ],
                   ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(isLunas ? 'KWITANSI PELUNASAN' : 'NOTA TAGIHAN', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.blue800)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('No: $noRef', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                      pw.Text('Tanggal: $tanggalCetak', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 1.2, color: PdfColors.blue800),
-              pw.SizedBox(height: 8),
-              pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 4),
-              pw.Container(
-                padding: const pw.EdgeInsets.all(6),
-                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: pw.BorderRadius.circular(4)),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Row(children: [
-                      pw.SizedBox(width: 90, child: pw.Text('ID Pelanggan', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Expanded(child: pw.Text(': ${item['idpel'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
-                    ]),
-                    pw.SizedBox(height: 2),
-                    pw.Row(children: [
-                      pw.SizedBox(width: 90, child: pw.Text('Nama Lengkap', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Expanded(child: pw.Text(': ${item['nama'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
-                    ]),
-                    pw.SizedBox(height: 2),
-                    pw.Row(children: [
-                      pw.SizedBox(width: 90, child: pw.Text('Alamat', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Expanded(child: pw.Text(': ${item['alamat'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
-                    ]),
-                    pw.SizedBox(height: 2),
-                    pw.Row(children: [
-                      pw.SizedBox(width: 90, child: pw.Text('No WhatsApp', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Expanded(child: pw.Text(': ${item['no_hp'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
-                    ]),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Text('RINCIAN LAYANAN & TARIF', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 4),
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Deskripsi Paket / Layanan', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Periode (Bln)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Jumlah', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Paket Internet: ${item['paket'] ?? '-'}\nLangganan Akses Internet Unlimited', style: const pw.TextStyle(fontSize: 8))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('${item['jumlah_bulan_tunggakan'] ?? '1'}', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right)),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 6),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.SizedBox(
-                    width: 200,
+                  pw.SizedBox(height: 10),
+                  pw.Divider(thickness: 1.2, color: PdfColors.blue800),
+                  pw.SizedBox(height: 8),
+                  pw.Text('DATA PELANGGAN', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                  pw.SizedBox(height: 4),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(6),
+                    decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: pw.BorderRadius.circular(4)),
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                          pw.Text('Subtotal (Excl. PPN):', style: const pw.TextStyle(fontSize: 8)),
-                          pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8)),
+                        pw.Row(children: [
+                          pw.SizedBox(width: 90, child: pw.Text('ID Pelanggan', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                          pw.Expanded(child: pw.Text(': ${item['idpel'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
                         ]),
                         pw.SizedBox(height: 2),
-                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                          pw.Text('PPN 11%:', style: const pw.TextStyle(fontSize: 8)),
-                          pw.Text('Rp $ppn', style: const pw.TextStyle(fontSize: 8)),
+                        pw.Row(children: [
+                          pw.SizedBox(width: 90, child: pw.Text('Nama Lengkap', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                          pw.Expanded(child: pw.Text(': ${item['nama'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
                         ]),
-                        pw.Divider(thickness: 0.8),
-                        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                          pw.Text('TOTAL PEMBAYARAN:', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                          pw.Text('Rp $totalNominal', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                        pw.SizedBox(height: 2),
+                        pw.Row(children: [
+                          pw.SizedBox(width: 90, child: pw.Text('Alamat', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                          pw.Expanded(child: pw.Text(': ${item['alamat'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
+                        ]),
+                        pw.SizedBox(height: 2),
+                        pw.Row(children: [
+                          pw.SizedBox(width: 90, child: pw.Text('No WhatsApp', style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                          pw.Expanded(child: pw.Text(': ${item['no_hp'] ?? '-'}', style: const pw.TextStyle(fontSize: 8))),
                         ]),
                       ],
                     ),
                   ),
-                ],
-              ),
-              pw.SizedBox(height: 8),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  pw.SizedBox(height: 10),
+                  pw.Text('RINCIAN LAYANAN & TARIF', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                  pw.SizedBox(height: 4),
+                  pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey400),
                     children: [
-                      pw.Text('Status: ${isLunas ? "LUNAS" : "BELUM LUNAS"}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.red800)),
-                      if (isLunas) ...[
-                        pw.Text('Metode Bayar: ${item['metode_pembayaran'] ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
-                        pw.Text('Admin / Petugas: ${item['petugas_penerima'] ?? "Admin BM Network"}', style: const pw.TextStyle(fontSize: 8)),
-                      ]
+                      pw.TableRow(
+                        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Deskripsi Paket / Layanan', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Periode (Bln)', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Jumlah', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                        ],
+                      ),
+                      pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Paket Internet: ${item['paket'] ?? '-'}\nLangganan Akses Internet Unlimited', style: const pw.TextStyle(fontSize: 8))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('${item['jumlah_bulan_tunggakan'] ?? '1'}', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center)),
+                          pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right)),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-              pw.SizedBox(height: 8),
-              if (!isLunas) ...[
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(6),
-                  decoration: pw.BoxDecoration(color: PdfColors.blue50, border: pw.Border.all(color: PdfColors.blue200), borderRadius: pw.BorderRadius.circular(4)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  pw.SizedBox(height: 6),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
                     children: [
-                      pw.Text('METODE PEMBAYARAN (TRANSFER BANK, E-WALLET & QRIS):', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                      pw.SizedBox(height: 3),
-                      pw.Text('• Transfer Bank BCA: 2801-971-611 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
-                      pw.Text('• E-Wallet (DANA / OVO / GoPay / ShopeePay): 0838-2777-7207 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
-                      pw.Text('• QRIS: Scan kode QR resmi BM Network pada aplikasi Mobile Banking atau E-Wallet Anda.', style: const pw.TextStyle(fontSize: 7)),
-                      pw.Text('• Mohon cantumkan ID Pelanggan (${item['idpel']}) pada catatan/berita transfer.', style: const pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(
+                        width: 200,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                              pw.Text('Subtotal (Excl. PPN):', style: const pw.TextStyle(fontSize: 8)),
+                              pw.Text('Rp $dpp', style: const pw.TextStyle(fontSize: 8)),
+                            ]),
+                            pw.SizedBox(height: 2),
+                            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                              pw.Text('PPN 11%:', style: const pw.TextStyle(fontSize: 8)),
+                              pw.Text('Rp $ppn', style: const pw.TextStyle(fontSize: 8)),
+                            ]),
+                            pw.Divider(thickness: 0.8),
+                            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                              pw.Text('TOTAL PEMBAYARAN:', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                              pw.Text('Rp $totalNominal', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                            ]),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                pw.SizedBox(height: 6),
-              ],
-              pw.Container(
-                padding: const pw.EdgeInsets.all(5),
-                decoration: pw.BoxDecoration(color: PdfColors.grey100, border: pw.Border.all(color: PdfColors.grey300)),
-                child: pw.Text(
-                  isLunas 
-                    ? "Terima kasih, pembayaran Anda telah diterima sah oleh sistem BM Network. Simpan kwitansi ini sebagai bukti pembayaran yang sah."
-                    : "PERHATIAN: Mohon lakukan pembayaran sebelum tanggal jatuh tempo untuk menghindari isolir otomatis jaringan internet Anda. Abaikan penagihan jika pembayaran telah dilakukan.",
-                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
-                ),
+                  pw.SizedBox(height: 8),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Status: ${isLunas ? "LUNAS" : "BELUM LUNAS"}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: isLunas ? PdfColors.green800 : PdfColors.red800)),
+                          if (isLunas) ...[
+                            pw.Text('Metode Bayar: ${item['metode_pembayaran'] ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
+                            pw.Text('Admin / Petugas: ${item['petugas_penerima'] ?? "Admin BM Network"}', style: const pw.TextStyle(fontSize: 8)),
+                          ]
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 8),
+                  if (!isLunas) ...[
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(6),
+                      decoration: pw.BoxDecoration(color: PdfColors.blue50, border: pw.Border.all(color: PdfColors.blue200), borderRadius: pw.BorderRadius.circular(4)),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('METODE PEMBAYARAN (TRANSFER BANK, E-WALLET & QRIS):', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('• Transfer Bank BCA: 2801-971-611 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
+                          pw.Text('• E-Wallet (DANA / OVO / GoPay / ShopeePay): 0838-2777-7207 a.n. Irsyam Aufar Zuhdan', style: const pw.TextStyle(fontSize: 7)),
+                          pw.Text('• QRIS: Scan kode QR resmi BM Network pada aplikasi Mobile Banking atau E-Wallet Anda.', style: const pw.TextStyle(fontSize: 7)),
+                          pw.Text('• Mohon cantumkan ID Pelanggan (${item['idpel']}) pada catatan/berita transfer.', style: const pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                  ],
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(5),
+                    decoration: pw.BoxDecoration(color: PdfColors.grey100, border: pw.Border.all(color: PdfColors.grey300)),
+                    child: pw.Text(
+                      isLunas 
+                        ? "Terima kasih, pembayaran Anda telah diterima sah oleh sistem BM Network. Simpan kwitansi ini sebagai bukti pembayaran yang sah."
+                        : "PERHATIAN: Mohon lakukan pembayaran sebelum tanggal jatuh tempo untuk menghindari isolir otomatis jaringan internet Anda. Abaikan penagihan jika pembayaran telah dilakukan.",
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
+                    ),
+                  ),
+                ],
               ),
             ],
           );
@@ -847,7 +873,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   }
 }
 
-// ================= TAB 2: HALAMAN PENGELUARAN (DENGAN EDIT LIST) =================
+// ================= TAB 2: HALAMAN PENGELUARAN =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
@@ -861,18 +887,15 @@ class PengeluaranPage extends StatefulWidget {
 
 class _PengeluaranPageState extends State<PengeluaranPage> {
   
-  // Dialog Tambah / Edit Pengeluaran dengan Fitur Belanja Aset Lengkap
   void _showFormPengeluaranDialog(BuildContext context, {Map? itemEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController keteranganController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : '');
     final TextEditingController nominalController = TextEditingController(text: isEdit ? itemEdit['nominal'] : '');
     
-    // Controller Khusus FO
     final TextEditingController coreFoController = TextEditingController(text: '2');
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
 
-    // Controller Aset Umum / Non-FO
     final TextEditingController jumlahStokController = TextEditingController(text: '1');
     final TextEditingController satuanStokController = TextEditingController(text: 'Pcs');
 
@@ -981,7 +1004,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                   onPressed: () async {
                     if (nominalController.text.isEmpty || keteranganController.text.isEmpty) return;
                     
-                    // Hitung otomatis jika FO
                     String finalJumlahStok = jumlahStokController.text;
                     String finalSatuanStok = satuanStokController.text;
                     String namaBarangFinal = keteranganController.text;
@@ -1071,7 +1093,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   }
 }
 
-// ================= TAB 3: HALAMAN STOK BARANG (DENGAN TAMBAH & EDIT STOK) =================
+// ================= TAB 3: HALAMAN STOK BARANG =================
 class StokBarangPage extends StatefulWidget {
   final List stok;
   final bool isLoading;
@@ -1085,7 +1107,6 @@ class StokBarangPage extends StatefulWidget {
 
 class _StokBarangPageState extends State<StokBarangPage> {
 
-  // Dialog Tambah Stok Gudang Manual atau Edit Stok
   void _showFormStokDialog(BuildContext context, {Map? itemEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama_barang'] : '');
@@ -1193,7 +1214,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
   }
 }
 
-// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN LENGKAP =================
+// ================= TAB 4: DASHBOARD KEUANGAN & LAPORAN =================
 class DashboardKeuanganPage extends StatefulWidget {
   final List pelanggan;
   final List pengeluaran;
@@ -1470,7 +1491,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
