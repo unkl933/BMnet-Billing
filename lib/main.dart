@@ -95,6 +95,173 @@ class BillingHomePage extends StatelessWidget {
 
   const BillingHomePage({super.key, required this.pelanggan, required this.stok, required this.isLoading, required this.onRefresh});
 
+  void _showPelangganDetailDialog(BuildContext context, Map item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(item['nama'] ?? 'Detail Pelanggan', style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
+              Text('Alamat       : ${item['alamat'] ?? '-'}'),
+              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
+              Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
+              Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
+              Text('Material     : ${item['material_terpakai'] ?? '-'}'),
+              const Divider(),
+              Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: (item['status'] == 'Lunas') ? Colors.green : Colors.red)),
+              Text('Total Tagihan: Rp ${item['total_tunggakan'] ?? '0'}'),
+              Text('Metode Bayar : ${item['metode_pembayaran'] ?? '-'}'),
+            ],
+          ),
+        ),
+        actions: [
+          if ((item['status'] ?? '').toString().toLowerCase() != 'lunas')
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+              onPressed: () {
+                Navigator.pop(context);
+                _showBayarDialog(context, item);
+              },
+              icon: const Icon(Icons.payment, size: 16),
+              label: const Text('Bayar'),
+            ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _showEditPelangganDialog(context, item);
+            },
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('Edit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBayarDialog(BuildContext context, Map item) {
+    String selectedMetode = 'Tunai';
+    final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS'];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Pelunasan Tagihan: ${item['nama']}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total Tunggakan: Rp ${item['total_tunggakan']}'),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
+                    value: selectedMetode,
+                    items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                    onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final payload = {
+                      "action": "bayar_pelanggan",
+                      "idpel": item['idpel'],
+                      "metode_pembayaran": selectedMetode,
+                      "status": "Lunas"
+                    };
+                    try {
+                      final response = await http.post(
+                        Uri.parse(scriptUrl),
+                        headers: {"Content-Type": "application/json"},
+                        body: json.encode(payload),
+                      );
+                      if (response.statusCode == 200 || response.statusCode == 302) {
+                        onRefresh();
+                      }
+                    } catch (e) {
+                      // handle catch
+                    }
+                  },
+                  child: const Text('Konfirmasi Lunas'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditPelangganDialog(BuildContext context, Map item) {
+    final TextEditingController namaController = TextEditingController(text: item['nama']);
+    final TextEditingController alamatController = TextEditingController(text: item['alamat']);
+    final TextEditingController hpController = TextEditingController(text: item['no_hp']);
+    final TextEditingController teknisiController = TextEditingController(text: item['teknisi']);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Data: ${item['nama']}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
+                TextField(controller: alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
+                TextField(controller: hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
+                TextField(controller: teknisiController, decoration: const InputDecoration(labelText: 'Teknisi')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final payload = {
+                  "action": "edit_pelanggan",
+                  "idpel": item['idpel'],
+                  "nama": namaController.text,
+                  "alamat": alamatController.text,
+                  "no_hp": hpController.text,
+                  "teknisi": teknisiController.text,
+                };
+                try {
+                  final response = await http.post(
+                    Uri.parse(scriptUrl),
+                    headers: {"Content-Type": "application/json"},
+                    body: json.encode(payload),
+                  );
+                  if (response.statusCode == 200 || response.statusCode == 302) {
+                    onRefresh();
+                  }
+                } catch (e) {
+                  // handle error
+                }
+              },
+              child: const Text('Simpan Perubahan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -108,33 +275,7 @@ class BillingHomePage extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text(item['nama'] ?? 'Detail Pelanggan'),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('ID Pelanggan: ${item['idpel']}'),
-                              Text('Alamat: ${item['alamat']}'),
-                              Text('Paket: ${item['paket']}'),
-                              Text('No HP: ${item['no_hp']}'),
-                              Text('Teknisi: ${item['teknisi']}'),
-                              Text('Material: ${item['material_terpakai']}'),
-                              Text('Status: ${item['status']}'),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Tutup'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    onTap: () => _showPelangganDetailDialog(context, item),
                     title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTeknisi: ${item['teknisi'] ?? '-'}\nMaterial: ${item['material_terpakai'] ?? '-'}'),
                     isThreeLine: true,
