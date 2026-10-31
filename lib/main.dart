@@ -237,7 +237,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   int hargaInt = int.tryParse(selectedPaket!['harga'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 100000;
                   int totalTunggakan = (hargaInt * 1.11).round();
 
-                  var materialPakai = >[];
+                  List materialPakai = [];
                   if (selectedOnt != null) {
                     materialPakai.add({"nama": selectedOnt, "qty": 1});
                   }
