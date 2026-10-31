@@ -871,19 +871,114 @@ class PengeluaranPage extends StatefulWidget {
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
-  const PengeluaranPage({super.key, required this.pengeluaran, required this.stok, required this.isLoading, required this.onRefresh});
+  const PengeluaranPage({
+    super.key,
+    required this.pengeluaran,
+    required this.stok,
+    required this.isLoading,
+    required this.onRefresh,
+  });
 
   @override
   State<PengeluaranPage> createState() => _PengeluaranPageState();
 }
 
 class _PengeluaranPageState extends State<PengeluaranPage> {
-  
+  void _showPengeluaranDetailDialog(BuildContext context, Map item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          item['keterangan'] ?? 'Detail Pengeluaran',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Kategori   : ${item['kategori'] ?? '-'}'),
+              const SizedBox(height: 5),
+              Text('Nominal    : Rp ${item['nominal'] ?? '0'}'),
+              const SizedBox(height: 5),
+              Text('Tanggal    : ${item['tanggal'] ?? '-'}'),
+              if (item['jumlah_stok'] != null && item['jumlah_stok'].toString().isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text('Qty Stok   : ${item['jumlah_stok']} ${item['satuan_stok'] ?? ''}'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmHapusPengeluaran(item);
+            },
+            icon: const Icon(Icons.delete, size: 18),
+            label: const Text('Hapus'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(context);
+              _showFormPengeluaranDialog(context, itemEdit: item);
+            },
+            icon: const Icon(Icons.edit, size: 18),
+            label: const Text('Edit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmHapusPengeluaran(Map item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Hapus'),
+        content: Text('Yakin ingin menghapus pengeluaran "${item['keterangan']}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(context);
+              final payload = {
+                "action": "hapus_pengeluaran",
+                "index": widget.pengeluaran.indexOf(item),
+                "keterangan": item['keterangan'],
+              };
+              try {
+                final response = await http.post(
+                  Uri.parse(scriptUrl),
+                  headers: {"Content-Type": "application/json"},
+                  body: json.encode(payload),
+                );
+                if (response.statusCode == 200 || response.statusCode == 302) {
+                  widget.onRefresh();
+                }
+              } catch (e) {
+                // ignore
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showFormPengeluaranDialog(BuildContext context, {Map? itemEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController keteranganController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : '');
     final TextEditingController nominalController = TextEditingController(text: isEdit ? itemEdit['nominal'] : '');
-    
+
     final TextEditingController coreFoController = TextEditingController(text: '2');
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
@@ -904,16 +999,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
       'Penarikan Jalur FO'
     ];
 
-    final List<String> jenisAsetList = [
-      'ONT',
-      'OLT',
-      'FO',
-      'STB',
-      'Patchcore',
-      'Protect',
-      'Tools',
-      'Aksesoris'
-    ];
+    final List<String> jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
 
     showDialog(
       context: context,
@@ -936,7 +1022,6 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
-
                     if (isBelanjaAset) ...[
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
@@ -946,37 +1031,34 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       ),
                       const SizedBox(height: 10),
                     ],
-
                     TextField(
-                      controller: keteranganController, 
+                      controller: keteranganController,
                       decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
                     ),
                     const SizedBox(height: 10),
                     TextField(
-                      controller: nominalController, 
-                      keyboardType: TextInputType.number, 
+                      controller: nominalController,
+                      keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Total Nominal Biaya (Rp)'),
                     ),
-                    
                     if (isBelanjaAset) ...[
                       const SizedBox(height: 15),
                       const Divider(),
                       const Text('Konfigurasi Stok Gudang Otomatis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
                       const SizedBox(height: 8),
-
                       if (isFO) ...[
                         Row(
                           children: [
-                            Expanded(child: TextField(controller: coreFoController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Banyak Core (Cth: 2/4)'))),
+                            Expanded(child: TextField(controller: coreFoController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Banyak Core'))),
                             const SizedBox(width: 8),
                             Expanded(child: TextField(controller: rollFoController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Banyak Roll'))),
                           ],
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: meterPerRollController, 
-                          keyboardType: TextInputType.number, 
-                          decoration: const InputDecoration(labelText: 'Meter Per Roll (Cth: 1000)'),
+                          controller: meterPerRollController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Meter Per Roll'),
                         ),
                       ] else ...[
                         Row(
@@ -996,7 +1078,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nominalController.text.isEmpty) return;
-                    
+
                     String finalJumlahStok = jumlahStokController.text;
                     String finalSatuanStok = satuanStokController.text;
                     String namaBarangFinal = keteranganController.text;
@@ -1052,7 +1134,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Pengeluaran (${widget.pengeluaran.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
+      appBar: AppBar(
+        title: Text('Pengeluaran (${widget.pengeluaran.length})'),
+        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)],
+      ),
       body: widget.isLoading
           ? const Center(child: CircularProgressIndicator())
           : widget.pengeluaran.isEmpty
@@ -1064,24 +1149,22 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
+                        onTap: () => _showPengeluaranDetailDialog(context, item),
                         leading: const Icon(Icons.money_off, color: Colors.red),
                         title: Text(item['keterangan'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTgl: ${item['tanggal'] ?? '-'}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
-                              onPressed: () => _showFormPengeluaranDialog(context, itemEdit: item),
-                            ),
-                          ],
+                        trailing: Text(
+                          'Rp ${item['nominal'] ?? '0'}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
                         ),
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _showFormPengeluaranDialog(context), child: const Icon(Icons.add)),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showFormPengeluaranDialog(context),
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
@@ -1092,13 +1175,105 @@ class StokBarangPage extends StatefulWidget {
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
-  const StokBarangPage({super.key, required this.stok, required this.isLoading, required this.onRefresh});
+  const StokBarangPage({
+    super.key,
+    required this.stok,
+    required this.isLoading,
+    required this.onRefresh,
+  });
 
   @override
   State<StokBarangPage> createState() => _StokBarangPageState();
 }
 
 class _StokBarangPageState extends State<StokBarangPage> {
+  void _showStokDetailDialog(BuildContext context, Map item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          item['nama_barang'] ?? 'Detail Barang',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Nama Barang : ${item['nama_barang'] ?? '-'}'),
+              const SizedBox(height: 5),
+              Text('Kategori    : ${item['kategori'] ?? '-'}'),
+              const SizedBox(height: 5),
+              Text('Sisa Stok   : ${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}'),
+              const SizedBox(height: 5),
+              Text('Keterangan  : ${item['keterangan'] ?? '-'}'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmHapusStok(item);
+            },
+            icon: const Icon(Icons.delete, size: 18),
+            label: const Text('Hapus'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(context);
+              _showFormStokDialog(context, itemEdit: item);
+            },
+            icon: const Icon(Icons.edit, size: 18),
+            label: const Text('Edit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmHapusStok(Map item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Hapus'),
+        content: Text('Yakin ingin menghapus barang "${item['nama_barang']}" dari stok?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(context);
+              final payload = {
+                "action": "hapus_stok",
+                "index": widget.stok.indexOf(item),
+                "nama_barang": item['nama_barang'],
+              };
+              try {
+                final response = await http.post(
+                  Uri.parse(scriptUrl),
+                  headers: {"Content-Type": "application/json"},
+                  body: json.encode(payload),
+                );
+                if (response.statusCode == 200 || response.statusCode == 302) {
+                  widget.onRefresh();
+                }
+              } catch (e) {
+                // ignore
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showFormStokDialog(BuildContext context, {Map? itemEdit}) {
     bool isEdit = itemEdit != null;
@@ -1165,7 +1340,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Stok Barang Jaringan (${widget.stok.length})'), 
+        title: Text('Stok Barang Jaringan (${widget.stok.length})'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)
         ],
@@ -1181,18 +1356,13 @@ class _StokBarangPageState extends State<StokBarangPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
+                        onTap: () => _showStokDetailDialog(context, item),
                         leading: const Icon(Icons.router, color: Colors.indigo),
                         title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
-                              onPressed: () => _showFormStokDialog(context, itemEdit: item),
-                            ),
-                          ],
+                        trailing: Text(
+                          '${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
                         ),
                       ),
                     );
@@ -1570,7 +1740,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, // PERBAIKAN: Menggunakan CrossAxisAlignment milik Flutter UI
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
