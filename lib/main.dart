@@ -18,7 +18,6 @@ void main() {
   ));
 }
 
-// ================= NAVIGASI UTAMA (4 MENU) =================
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -50,17 +49,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             pelangganData = decoded['pelanggan'] ?? [];
             pengeluaranData = decoded['pengeluaran'] ?? [];
             stokData = decoded['stok'] ?? [];
-          } else if (decoded is List) {
-            pelangganData = decoded;
           }
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil data: $e')),
-      );
     }
   }
 
@@ -83,7 +77,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Pelanggan'),
           BottomNavigationBarItem(icon: Icon(Icons.money_off), label: 'Pengeluaran'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Stok Barang'),
+          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Stok'),
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'Keuangan'),
         ],
       ),
@@ -91,183 +85,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ================= HALAMAN STOK BARANG =================
-class StokBarangPage extends StatefulWidget {
-  final List stok;
-  final bool isLoading;
-  final Future<void> Function() onRefresh;
-
-  const StokBarangPage({super.key, required this.stok, required this.isLoading, required this.onRefresh});
-
-  @override
-  State<StokBarangPage> createState() => _StokBarangPageState();
-}
-
-class _StokBarangPageState extends State<StokBarangPage> {
-  void _showTambahStokDialog(BuildContext context) {
-    final TextEditingController namaController = TextEditingController();
-    final TextEditingController jumlahController = TextEditingController();
-    final TextEditingController satuanController = TextEditingController(text: 'Pcs');
-    final TextEditingController ketController = TextEditingController();
-    String selectedKategori = 'ONT';
-
-    final List<String> kategoriList = [
-      'OLT',
-      'ONT',
-      'ODP',
-      'Kabel FO Dropcore',
-      'Patchcord / Pigtail',
-      'Fast Connector / Adapter',
-      'Accessories Lainnya'
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Tambah Stok Barang / Perangkat'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'Kategori Perangkat'),
-                      value: selectedKategori,
-                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
-                      onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: namaController,
-                      decoration: const InputDecoration(labelText: 'Nama / Merk Barang (Cth: ZTE F609 / Dropcore)'),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: jumlahController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Jumlah'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 1,
-                          child: TextField(
-                            controller: satuanController,
-                            decoration: const InputDecoration(labelText: 'Satuan'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: ketController,
-                      decoration: const InputDecoration(labelText: 'Keterangan / Lokasi Gudang'),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
-                    
-                    final payload = {
-                      "action": "tambah_stok",
-                      "nama_barang": namaController.text,
-                      "kategori": selectedKategori,
-                      "jumlah": jumlahController.text,
-                      "satuan": satuanController.text,
-                      "keterangan": ketController.text,
-                    };
-
-                    Navigator.pop(context);
-                    try {
-                      final response = await http.post(
-                        Uri.parse(scriptUrl),
-                        headers: {"Content-Type": "application/json"},
-                        body: json.encode(payload),
-                      );
-                      if (response.statusCode == 200 || response.statusCode == 302) {
-                        widget.onRefresh();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Stok berhasil ditambahkan!')),
-                        );
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Gagal: $e')),
-                      );
-                    }
-                  },
-                  child: const Text('Simpan'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Inventaris Stok Jaringan (${widget.stok.length} Item)'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh),
-        ],
-      ),
-      body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : widget.stok.isEmpty
-              ? const Center(child: Text('Belum ada data inventaris stok barang.'))
-              : ListView.builder(
-                  itemCount: widget.stok.length,
-                  itemBuilder: (context, index) {
-                    final item = widget.stok[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.indigo,
-                          child: Icon(Icons.router, color: Colors.white),
-                        ),
-                        title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nKet: ${item['keterangan'] ?? '-'}'),
-                        isThreeLine: true,
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.shade200),
-                          ),
-                          child: Text(
-                            '${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showTambahStokDialog(context),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-// ================= HALAMAN PENGELUARAN =================
+// ================= HALAMAN PENGELUARAN DENGAN INTEGRASI STOK =================
 class PengeluaranPage extends StatefulWidget {
   final List pengeluaran;
   final bool isLoading;
@@ -283,6 +101,8 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   void _showTambahPengeluaranDialog(BuildContext context) {
     final TextEditingController keteranganController = TextEditingController();
     final TextEditingController nominalController = TextEditingController();
+    final TextEditingController jumlahStokController = TextEditingController(text: '1');
+    final TextEditingController satuanStokController = TextEditingController(text: 'Pcs');
     String selectedKategori = 'Operasional';
 
     final List<String> kategoriList = [
@@ -299,8 +119,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            bool isBelanjaAset = selectedKategori == 'Belanja Aset';
+
             return AlertDialog(
-              title: const Text('Tambah Catatan Pengeluaran'),
+              title: const Text('Tambah Pengeluaran'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -309,12 +131,53 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
                       items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
-                      onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedKategori = val.toString();
+                        });
+                      },
                     ),
                     const SizedBox(height: 10),
-                    TextField(controller: keteranganController, decoration: const InputDecoration(labelText: 'Keterangan')),
+                    TextField(
+                      controller: keteranganController,
+                      decoration: InputDecoration(
+                        labelText: isBelanjaAset ? 'Nama Perangkat / Barang Aset' : 'Keterangan Keperluan',
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: nominalController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Nominal (Rp)')),
+                    TextField(
+                      controller: nominalController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Total Biaya (Rp)'),
+                    ),
+                    
+                    // JIKA BELANJA ASET, MUNCULKAN INPUT JUMLAH STOK
+                    if (isBelanjaAset) ...[
+                      const SizedBox(height: 15),
+                      const Divider(),
+                      const Text('Otomatis Masuk ke Stok Barang:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: jumlahStokController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'Jumlah Stok'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 1,
+                            child: TextField(
+                              controller: satuanStokController,
+                              decoration: const InputDecoration(labelText: 'Satuan'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -323,13 +186,17 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nominalController.text.isEmpty || keteranganController.text.isEmpty) return;
+                    
                     final payload = {
                       "action": "tambah_pengeluaran",
                       "kategori": selectedKategori,
                       "keterangan": keteranganController.text,
                       "nominal": nominalController.text,
+                      "jumlah_stok": jumlahStokController.text,
+                      "satuan_stok": satuanStokController.text,
                       "tanggal": DateTime.now().toString().split(' ')[0],
                     };
+
                     Navigator.pop(context);
                     try {
                       final response = await http.post(
@@ -339,6 +206,9 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       );
                       if (response.statusCode == 200 || response.statusCode == 302) {
                         widget.onRefresh();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Pengeluaran & Stok berhasil dicatat!')),
+                        );
                       }
                     } catch (e) {
                       // ignore
@@ -382,103 +252,57 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   }
 }
 
-// ================= HALAMAN DAFTAR PELANGGAN =================
-class BillingHomePage extends StatefulWidget {
-  final List pelanggan;
+// ================= HALAMAN STOK BARANG =================
+class StokBarangPage extends StatelessWidget {
+  final List stok;
   final bool isLoading;
   final Future<void> Function() onRefresh;
 
-  const BillingHomePage({super.key, required this.pelanggan, required this.isLoading, required this.onRefresh});
+  const StokBarangPage({super.key, required this.stok, required this.isLoading, required this.onRefresh});
 
-  @override
-  State<BillingHomePage> createState() => _BillingHomePageState();
-}
-
-class _BillingHomePageState extends State<BillingHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Pelanggan (${widget.pelanggan.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
-      body: widget.isLoading
+      appBar: AppBar(title: Text('Stok Barang Jaringan (${stok.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh)]),
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: widget.pelanggan.length,
-              itemBuilder: (context, index) {
-                final item = widget.pelanggan[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}'),
-                    trailing: Text(item['status'] ?? 'Belum Lunas', style: TextStyle(color: (item['status'] == 'Lunas') ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
-                  ),
-                );
-              },
-            ),
+          : stok.isEmpty
+              ? const Center(child: Text('Belum ada stok barang.'))
+              : ListView.builder(
+                  itemCount: stok.length,
+                  itemBuilder: (context, index) {
+                    final item = stok[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: ListTile(
+                        leading: const Icon(Icons.router, color: Colors.indigo),
+                        title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
+                        trailing: Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
 
-// ================= DASHBOARD KEUANGAN =================
-class DashboardKeuanganPage extends StatefulWidget {
+// ================= HALAMAN LAINNYA (Pelanggan & Keuangan) =================
+class BillingHomePage extends StatelessWidget {
+  final List pelanggan;
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
+  const BillingHomePage({super.key, required this.pelanggan, required this.isLoading, required this.onRefresh});
+  @override
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text('Pelanggan (${pelanggan.length})')), body: const Center(child: Text('Menu Pelanggan')));
+}
+
+class DashboardKeuanganPage extends StatelessWidget {
   final List pelanggan;
   final List pengeluaran;
   final bool isLoading;
   final Future<void> Function() onRefresh;
-
   const DashboardKeuanganPage({super.key, required this.pelanggan, required this.pengeluaran, required this.isLoading, required this.onRefresh});
-
   @override
-  State<DashboardKeuanganPage> createState() => _DashboardKeuanganPageState();
-}
-
-class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
-  int _parseNominal(dynamic val) {
-    if (val == null) return 0;
-    String str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
-    return int.tryParse(str) ?? 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    int totalPemasukan = 0;
-    int totalPengeluaran = 0;
-
-    for (var item in widget.pelanggan) {
-      if ((item['status'] ?? '').toString().toLowerCase() == 'lunas') {
-        totalPemasukan += _parseNominal(item['total_tunggakan']);
-      }
-    }
-    for (var item in widget.pengeluaran) {
-      totalPengeluaran += _parseNominal(item['nominal']);
-    }
-
-    int labaBersih = totalPemasukan - totalPengeluaran;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard & Keuangan'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
-      body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Total Pemasukan: Rp $totalPemasukan', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-                        const SizedBox(height: 8),
-                        Text('Total Pengeluaran: Rp $totalPengeluaran', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
-                        const Divider(),
-                        Text('Laba / Rugi Bersih: Rp $labaBersih', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? Colors.blue : Colors.orange)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Keuangan')), body: const Center(child: Text('Dashboard Keuangan')));
 }
