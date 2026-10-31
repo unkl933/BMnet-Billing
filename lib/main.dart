@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// Perbaikan deklarasi list global paket internet
+// Daftar Paket Global agar bisa diedit dan ditambah di seluruh halaman
 List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -345,7 +345,7 @@ class BillingHomePage extends StatelessWidget {
             children: [
               Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
               Text('Alamat       : ${item['alamat'] ?? '-'}'),
-              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'}'),
+              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
               Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
               Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
               Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
@@ -1570,7 +1570,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start, // PERBAIKAN: Menggunakan CrossAxisAlignment milik Flutter UI
                       children: [
                         Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
                         const SizedBox(height: 8),
