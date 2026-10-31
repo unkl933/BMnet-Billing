@@ -108,6 +108,33 @@ class BillingHomePage extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(item['nama'] ?? 'Detail Pelanggan'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('ID Pelanggan: ${item['idpel']}'),
+                              Text('Alamat: ${item['alamat']}'),
+                              Text('Paket: ${item['paket']}'),
+                              Text('No HP: ${item['no_hp']}'),
+                              Text('Teknisi: ${item['teknisi']}'),
+                              Text('Material: ${item['material_terpakai']}'),
+                              Text('Status: ${item['status']}'),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Tutup'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTeknisi: ${item['teknisi'] ?? '-'}\nMaterial: ${item['material_terpakai'] ?? '-'}'),
                     isThreeLine: true,
