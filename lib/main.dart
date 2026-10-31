@@ -585,7 +585,6 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    // PERBAIKAN: Memeriksa kategori DAN nama_barang agar ONT dari Belanja Aset ikut terpanggil
     List ontList = widget.stokList.where((s) {
       final kat = (s['kategori'] ?? '').toString().toLowerCase();
       final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
@@ -739,14 +738,14 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
   @override
   void initState() {
     super.initState();
-    _namaController = TextEditingController(text: widget.pelangganItem['nama']);
-    _alamatController = TextEditingController(text: widget.pelangganItem['alamat']);
-    _hpController = TextEditingController(text: widget.pelangganItem['no_hp']);
+    _namaController = TextEditingController(text: widget.pelangganItem['nama']?.toString() ?? '');
+    _alamatController = TextEditingController(text: widget.pelangganItem['alamat']?.toString() ?? '');
+    _hpController = TextEditingController(text: widget.pelangganItem['no_hp']?.toString() ?? '');
     _bulanController = TextEditingController(text: widget.pelangganItem['jumlah_bulan_tunggakan']?.toString() ?? '1');
-    _snOntController = TextEditingController(text: widget.pelangganItem['sn_ont'] ?? '');
-    _gangguanController = TextEditingController(text: widget.pelangganItem['jenis_gangguan'] ?? '');
-    _teknisiController = TextEditingController(text: widget.pelangganItem['teknisi'] ?? '');
-    selectedStatus = widget.pelangganItem['status'] ?? 'Belum Lunas';
+    _snOntController = TextEditingController(text: widget.pelangganItem['sn_ont']?.toString() ?? '');
+    _gangguanController = TextEditingController(text: widget.pelangganItem['jenis_gangguan']?.toString() ?? '');
+    _teknisiController = TextEditingController(text: widget.pelangganItem['teknisi']?.toString() ?? '');
+    selectedStatus = widget.pelangganItem['status']?.toString() ?? 'Belum Lunas';
     
     var currentPaketName = widget.pelangganItem['paket'];
     for (var p in daftarPaketGlobal) {
@@ -759,7 +758,6 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    // PERBAIKAN: Memeriksa kategori DAN nama_barang agar ONT dari Belanja Aset ikut terpanggil
     List ontList = widget.stokList.where((s) {
       final kat = (s['kategori'] ?? '').toString().toLowerCase();
       final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
@@ -894,12 +892,12 @@ class PengeluaranPage extends StatefulWidget {
 }
 
 class _PengeluaranPageState extends State<PengeluaranPage> {
-  void _showPengeluaranDetailDialog(BuildContext parentContext, Map item) {
+  void _showPengeluaranDetailDialog(Map item) {
     showDialog(
-      context: parentContext,
+      context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          item['keterangan'] ?? 'Detail Pengeluaran',
+          item['keterangan']?.toString() ?? 'Detail Pengeluaran',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
@@ -933,7 +931,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(dialogContext);
-              _showFormPengeluaranDialog(parentContext, itemEdit: item);
+              _showFormPengeluaranDialog(itemEdit: item);
             },
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('Edit'),
@@ -950,15 +948,15 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   void _confirmHapusPengeluaran(Map item) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
         content: Text('Yakin ingin menghapus pengeluaran "${item['keterangan']}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               final payload = {
                 "action": "hapus_pengeluaran",
                 "index": widget.pengeluaran.indexOf(item),
@@ -984,17 +982,25 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     );
   }
 
-  void _showFormPengeluaranDialog(BuildContext context, {Map? itemEdit}) {
+  void _showFormPengeluaranDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
-    final TextEditingController keteranganController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : '');
-    final TextEditingController nominalController = TextEditingController(text: isEdit ? itemEdit['nominal'] : '');
+    final TextEditingController keteranganController = TextEditingController(
+      text: isEdit ? (itemEdit['keterangan']?.toString() ?? '') : '',
+    );
+    final TextEditingController nominalController = TextEditingController(
+      text: isEdit ? (itemEdit['nominal']?.toString() ?? '') : '',
+    );
 
     final TextEditingController coreFoController = TextEditingController(text: '2');
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
 
-    final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok'] ?? '1') : '1');
-    final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok'] ?? 'Pcs') : 'Pcs');
+    final TextEditingController jumlahStokController = TextEditingController(
+      text: isEdit ? (itemEdit['jumlah_stok']?.toString() ?? '1') : '1',
+    );
+    final TextEditingController satuanStokController = TextEditingController(
+      text: isEdit ? (itemEdit['satuan_stok']?.toString() ?? 'Pcs') : 'Pcs',
+    );
 
     final List<String> kategoriList = [
       'Belanja Aset',
@@ -1008,7 +1014,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
 
     final List<String> jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
 
-    String selectedKategori = isEdit ? (itemEdit['kategori'] ?? 'Operasional').toString().trim() : 'Operasional';
+    String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Operasional').trim() : 'Operasional';
     if (!kategoriList.contains(selectedKategori)) {
       selectedKategori = 'Operasional';
     }
@@ -1017,9 +1023,9 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogContext, setDialogState) {
             bool isBelanjaAset = selectedKategori == 'Belanja Aset';
             bool isFO = isBelanjaAset && selectedJenisAset == 'FO';
 
@@ -1088,7 +1094,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
                 ElevatedButton(
                   onPressed: () async {
                     if (nominalController.text.isEmpty) return;
@@ -1118,10 +1124,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       "nominal": nominalController.text,
                       "jumlah_stok": finalJumlahStok,
                       "satuan_stok": finalSatuanStok,
-                      "tanggal": isEdit ? (itemEdit['tanggal'] ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
+                      "tanggal": isEdit ? (itemEdit['tanggal']?.toString() ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
                     };
 
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     try {
                       final response = await http.post(
                         Uri.parse(scriptUrl),
@@ -1163,9 +1169,9 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
-                        onTap: () => _showPengeluaranDetailDialog(context, item),
+                        onTap: () => _showPengeluaranDetailDialog(item),
                         leading: const Icon(Icons.money_off, color: Colors.red),
-                        title: Text(item['keterangan'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(item['keterangan']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTgl: ${item['tanggal'] ?? '-'}'),
                         trailing: Text(
                           'Rp ${item['nominal'] ?? '0'}',
@@ -1176,7 +1182,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                   },
                 ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showFormPengeluaranDialog(context),
+        onPressed: () => _showFormPengeluaranDialog(),
         child: const Icon(Icons.add),
       ),
     );
@@ -1201,12 +1207,12 @@ class StokBarangPage extends StatefulWidget {
 }
 
 class _StokBarangPageState extends State<StokBarangPage> {
-  void _showStokDetailDialog(BuildContext parentContext, Map item) {
+  void _showStokDetailDialog(Map item) {
     showDialog(
-      context: parentContext,
+      context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          item['nama_barang'] ?? 'Detail Barang',
+          item['nama_barang']?.toString() ?? 'Detail Barang',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
@@ -1238,7 +1244,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(dialogContext);
-              _showFormStokDialog(parentContext, itemEdit: item);
+              _showFormStokDialog(itemEdit: item);
             },
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('Edit'),
@@ -1255,15 +1261,15 @@ class _StokBarangPageState extends State<StokBarangPage> {
   void _confirmHapusStok(Map item) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
         content: Text('Yakin ingin menghapus barang "${item['nama_barang']}" dari stok?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               final payload = {
                 "action": "hapus_stok",
                 "index": widget.stok.indexOf(item),
@@ -1289,17 +1295,27 @@ class _StokBarangPageState extends State<StokBarangPage> {
     );
   }
 
-  void _showFormStokDialog(BuildContext context, {Map? itemEdit}) {
+  void _showFormStokDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
-    final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama_barang'] : '');
-    final TextEditingController kategoriController = TextEditingController(text: isEdit ? itemEdit['kategori'] : 'ONT/Perangkat');
-    final TextEditingController jumlahController = TextEditingController(text: isEdit ? itemEdit['jumlah'].toString() : '1');
-    final TextEditingController satuanController = TextEditingController(text: isEdit ? itemEdit['satuan'] : 'Pcs');
-    final TextEditingController ketController = TextEditingController(text: isEdit ? itemEdit['keterangan'] : 'Stok Gudang');
+    final TextEditingController namaController = TextEditingController(
+      text: isEdit ? (itemEdit['nama_barang']?.toString() ?? '') : '',
+    );
+    final TextEditingController kategoriController = TextEditingController(
+      text: isEdit ? (itemEdit['kategori']?.toString() ?? 'ONT/Perangkat') : 'ONT/Perangkat',
+    );
+    final TextEditingController jumlahController = TextEditingController(
+      text: isEdit ? (itemEdit['jumlah']?.toString() ?? '1') : '1',
+    );
+    final TextEditingController satuanController = TextEditingController(
+      text: isEdit ? (itemEdit['satuan']?.toString() ?? 'Pcs') : 'Pcs',
+    );
+    final TextEditingController ketController = TextEditingController(
+      text: isEdit ? (itemEdit['keterangan']?.toString() ?? 'Stok Gudang') : 'Stok Gudang',
+    );
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual'),
           content: SingleChildScrollView(
@@ -1315,7 +1331,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
             ElevatedButton(
               onPressed: () async {
                 if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
@@ -1328,7 +1344,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                   "satuan": satuanController.text,
                   "keterangan": ketController.text,
                 };
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 try {
                   final response = await http.post(
                     Uri.parse(scriptUrl),
@@ -1370,9 +1386,9 @@ class _StokBarangPageState extends State<StokBarangPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: ListTile(
-                        onTap: () => _showStokDetailDialog(context, item),
+                        onTap: () => _showStokDetailDialog(item),
                         leading: const Icon(Icons.router, color: Colors.indigo),
-                        title: Text(item['nama_barang'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(item['nama_barang']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
                         trailing: Text(
                           '${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}',
@@ -1383,7 +1399,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                   },
                 ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showFormStokDialog(context),
+        onPressed: () => _showFormStokDialog(),
         child: const Icon(Icons.add),
         tooltip: 'Tambah Stok Barang',
       ),
