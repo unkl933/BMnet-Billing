@@ -18,7 +18,7 @@ const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Deklarasi menggunakan List polos
+// Deklarasi aman dengan List polos (Tipe inferred sebagai List<dynamic>)
 List daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
