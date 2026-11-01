@@ -18,8 +18,8 @@ const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Deklarasi aman menggunakan var (Bebas error sintaks <>)
-var daftarPaketGlobal = [
+// Deklarasi menggunakan List polos
+List daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
@@ -117,7 +117,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             stokData = decoded['stok'] ?? [];
 
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              var listPaketBaru = [];
+              List listPaketBaru = [];
               for (var item in (decoded['paket'] as List)) {
                 listPaketBaru.add({
                   'nama': item['nama']?.toString() ?? '',
