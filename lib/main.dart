@@ -21,10 +21,60 @@ var daftarPaketGlobal = >[
 ];
 
 void main() {
-  runApp(const MaterialApp(
-    home: MainNavigationScreen(),
-    debugShowCheckedModeBanner: false,
-  ));
+  runApp(const BMNetworkApp());
+}
+
+class BMNetworkApp extends StatelessWidget {
+  const BMNetworkApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BM Network Ops',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF06B6D4), // Cyan 500
+          secondary: Color(0xFF3B82F6), // Blue 500
+          surface: Color(0xFF1E293B), // Slate 800
+          surfaceContainerHigh: Color(0xFF334155), // Slate 700
+          error: Color(0xFFEF4444), // Red 500
+        ),
+        cardTheme: CardTheme(
+          color: const Color(0xFF1E293B),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF334155), width: 1),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: const Color(0xFF06B6D4),
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF0F172A),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF334155))),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF334155))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF06B6D4), width: 1.5)),
+          labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+      ),
+      home: const MainNavigationScreen(),
+    );
+  }
 }
 
 // ================= NAVIGASI UTAMA (5 TAB) =================
@@ -60,7 +110,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             pengeluaranData = decoded['pengeluaran'] ?? [];
             stokData = decoded['stok'] ?? [];
 
-            // Sinkronkan daftar paket dari Google Sheets jika tersedia
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
               daftarPaketGlobal = (decoded['paket'] as List).map>((item) {
                 return {
@@ -90,18 +139,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     return Scaffold(
       body: pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blueAccent,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Pelanggan'),
-          BottomNavigationBarItem(icon: Icon(Icons.money_off), label: 'Pengeluaran'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Stok'),
-          BottomNavigationBarItem(icon: Icon(Icons.wifi), label: 'Paket'),
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'Keuangan'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 1)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          backgroundColor: const Color(0xFF0F172A),
+          indicatorColor: const Color(0xFF06B6D4).withOpacity(0.2),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.people_alt_outlined), selectedIcon: Icon(Icons.people_alt, color: Color(0xFF06B6D4)), label: 'Pelanggan'),
+            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long, color: Color(0xFF06B6D4)), label: 'Pengeluaran'),
+            NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF06B6D4)), label: 'Stok'),
+            NavigationDestination(icon: Icon(Icons.wifi_tethering), selectedIcon: Icon(Icons.wifi_tethering, color: Color(0xFF06B6D4)), label: 'Paket'),
+            NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics, color: Color(0xFF06B6D4)), label: 'Keuangan'),
+          ],
+        ),
       ),
     );
   }
@@ -347,36 +401,55 @@ class BillingHomePage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(item['nama'] ?? 'Detail Pelanggan', style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(item['nama'] ?? 'Detail Pelanggan', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('ID Pelanggan : ${item['idpel'] ?? '-'}'),
-              Text('Alamat       : ${item['alamat'] ?? '-'}'),
-              Text('Paket        : ${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
-              Text('No HP/WA     : ${item['no_hp'] ?? '-'}'),
-              Text('Teknisi      : ${item['teknisi'] ?? '-'}'),
-              Text('Tunggakan    : ${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
-              Text('Petugas/Kasir: ${item['petugas_penerima'] ?? '-'}'),
-              const Divider(),
-              Text('Status       : ${item['status'] ?? 'Belum Lunas'}', style: TextStyle(fontWeight: FontWeight.bold, color: isLunas ? Colors.green : Colors.red)),
-              Text('Total Tagihan: Rp ${item['total_tunggakan'] ?? '0'}'),
-              Text('Metode Bayar : ${item['metode_pembayaran'] ?? '-'}'),
+              _buildDetailRow('ID Pelanggan', item['idpel'] ?? '-'),
+              _buildDetailRow('Alamat', item['alamat'] ?? '-'),
+              _buildDetailRow('Paket', '${item['paket'] ?? '-'} (${item['harga'] ?? '-'})'),
+              _buildDetailRow('No HP/WA', item['no_hp'] ?? '-'),
+              _buildDetailRow('Teknisi', item['teknisi'] ?? '-'),
+              _buildDetailRow('Tunggakan', '${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan'),
+              _buildDetailRow('Petugas/Kasir', item['petugas_penerima'] ?? '-'),
+              const Divider(color: Color(0xFF334155)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Status:', style: TextStyle(color: Color(0xFF94A3B8))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isLunas ? Colors.emerald.withOpacity(0.2) : Colors.rose.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isLunas ? Colors.emerald : Colors.rose),
+                    ),
+                    child: Text(
+                      item['status'] ?? 'Belum Lunas',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: isLunas ? Colors.emeraldAccent : Colors.roseAccent, fontSize: 12),
+                    ),
+                  )
+                ],
+              ),
+              const SizedBox(height: 6),
+              _buildDetailRow('Total Tagihan', 'Rp ${item['total_tunggakan'] ?? '0'}'),
+              _buildDetailRow('Metode Bayar', item['metode_pembayaran'] ?? '-'),
             ],
           ),
         ),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.teal),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF06B6D4)),
             onPressed: () => _sharePdfNotaWa(item, isLunas),
             icon: const Icon(Icons.picture_as_pdf, size: 16),
-            label: Text(isLunas ? 'Kirim Struk PDF' : 'Kirim Nota PDF'),
+            label: Text(isLunas ? 'Struk PDF' : 'Nota PDF'),
           ),
           if (!isLunas)
             ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.emerald, foregroundColor: Colors.black),
               onPressed: () {
                 Navigator.pop(context);
                 _showBayarDialog(context, item);
@@ -385,6 +458,7 @@ class BillingHomePage extends StatelessWidget {
               label: const Text('Bayar'),
             ),
           TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF3B82F6)),
             onPressed: () {
               Navigator.pop(context);
               Navigator.push(
@@ -397,8 +471,22 @@ class BillingHomePage extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
+            child: const Text('Tutup', style: TextStyle(color: Color(0xFF94A3B8))),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13))),
+          const Text(': ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+          Expanded(child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -415,23 +503,25 @@ class BillingHomePage extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Pelunasan: ${item['nama']}'),
+              backgroundColor: const Color(0xFF1E293B),
+              title: Text('Pelunasan: ${item['nama']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Tagihan (${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan): Rp ${item['total_tunggakan']}'),
-                    const SizedBox(height: 10),
+                    Text('Total Tagihan (${item['jumlah_bulan_tunggakan'] ?? '1'} Bulan): Rp ${item['total_tunggakan']}', style: const TextStyle(color: Color(0xFF06B6D4), fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: petugasController,
                       decoration: const InputDecoration(labelText: 'Nama Petugas / Kasir Penerima'),
                     ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField(
+                      dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Pilih Metode Pembayaran'),
                       value: selectedMetode,
-                      items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      items: metodeList.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(color: Colors.white)))).toList(),
                       onChanged: (val) => setDialogState(() => selectedMetode = val.toString()),
                     ),
                     const SizedBox(height: 15),
@@ -447,29 +537,33 @@ class BillingHomePage extends StatelessWidget {
                       ),
                     ] else if (selectedMetode == 'QRIS') ...[
                       const SizedBox(height: 10),
-                      const Text('Scan QRIS di bawah ini:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const Text('Scan QRIS di bawah ini:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
                       const SizedBox(height: 8),
                       Center(
-                        child: Image.asset(
-                          'assets/images/qris.png',
-                          height: 160,
-                          width: 160,
-                          errorBuilder: (context, error, stackTrace) => const Text(
-                            'QRIS Image not found in assets/images/qris.png',
-                            style: TextStyle(color: Colors.red, fontSize: 10),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                          child: Image.asset(
+                            'assets/images/qris.png',
+                            height: 150,
+                            width: 150,
+                            errorBuilder: (context, error, stackTrace) => const Text(
+                              'QRIS Image not found in assets/images/qris.png',
+                              style: TextStyle(color: Colors.red, fontSize: 10),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Atas Nama: Irsyam Aufar Zuhdan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                      const Text('Atas Nama: Irsyam Aufar Zuhdan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
                     ],
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.emerald, foregroundColor: Colors.black),
                   onPressed: () async {
                     Navigator.pop(context);
                     final payload = {
@@ -493,7 +587,7 @@ class BillingHomePage extends StatelessWidget {
                       // ignore
                     }
                   },
-                  child: const Text('Konfirmasi Lunas'),
+                  child: const Text('Konfirmasi Lunas', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -506,32 +600,106 @@ class BillingHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Pelanggan (${pelanggan.length})'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh)]),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Icon(Icons.wifi_rounded, color: Color(0xFF06B6D4), size: 24),
+            const SizedBox(width: 10),
+            Text('Pelanggan (${pelanggan.length})'),
+          ],
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF06B6D4)), onPressed: onRefresh),
+        ],
+      ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: pelanggan.length,
-              itemBuilder: (context, index) {
-                final item = pelanggan[index];
-                bool isLunas = (item['status'] ?? '').toString().toLowerCase() == 'lunas';
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    onTap: () => _showPelangganDetailDialog(context, item),
-                    title: Text(item['nama'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('ID: ${item['idpel']} | Paket: ${item['paket']}\nTagihan: ${item['jumlah_bulan_tunggakan'] ?? '1'} Bln (Rp ${item['total_tunggakan'] ?? '0'})\nStatus: ${item['status'] ?? 'Belum Lunas'}'),
-                    isThreeLine: true,
-                    trailing: IconButton(
-                      icon: const Icon(Icons.picture_as_pdf, color: Colors.teal),
-                      onPressed: () => _sharePdfNotaWa(item, isLunas),
-                      tooltip: 'Kirim PDF via WhatsApp',
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
+          : pelanggan.isEmpty
+              ? const Center(child: Text('Belum ada data pelanggan.', style: TextStyle(color: Color(0xFF94A3B8))))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  itemCount: pelanggan.length,
+                  itemBuilder: (context, index) {
+                    final item = pelanggan[index];
+                    bool isLunas = (item['status'] ?? '').toString().toLowerCase() == 'lunas';
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => _showPelangganDetailDialog(context, item),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: isLunas ? Colors.emerald.withOpacity(0.15) : Colors.rose.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  isLunas ? Icons.check_circle_outline : Icons.pending_actions_outlined,
+                                  color: isLunas ? Colors.emeraldAccent : Colors.roseAccent,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          item['nama'] ?? '-',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                                        ),
+                                        Text(
+                                          'ID: ${item['idpel'] ?? '-'}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace'),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Paket: ${item['paket'] ?? '-'} • Tagihan: Rp ${item['total_tunggakan'] ?? '0'}',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isLunas ? Colors.emerald.withOpacity(0.2) : Colors.rose.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            isLunas ? 'LUNAS' : '${item['jumlah_bulan_tunggakan'] ?? '1'} Bln Tunggakan',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isLunas ? Colors.emeraldAccent : Colors.roseAccent),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFF06B6D4)),
+                                onPressed: () => _sharePdfNotaWa(item, isLunas),
+                                tooltip: 'Kirim PDF via WA',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.person_add_alt_1_rounded),
+        label: const Text('Pasang Baru', style: TextStyle(fontWeight: FontWeight.bold)),
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -552,14 +720,18 @@ class ContainerInfoBayar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: Colors.blue.shade50, border: Border.all(color: Colors.blue.shade200), borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(judul, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
-          const SizedBox(height: 5),
-          Text(detail, style: const TextStyle(fontSize: 12)),
+          Text(judul, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3B82F6), fontSize: 13)),
+          const SizedBox(height: 6),
+          Text(detail, style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
         ],
       ),
     );
@@ -609,44 +781,47 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
           key: _formKey,
           child: ListView(
             children: [
-              const Text('Data Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
-              const Divider(),
+              const Text('Data Pelanggan', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF06B6D4), fontSize: 15)),
+              const SizedBox(height: 10),
               TextFormField(controller: _idpelController, decoration: const InputDecoration(labelText: 'ID Pelanggan (Opsional / Otomatis)')),
+              const SizedBox(height: 10),
               TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Lengkap'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
+              const SizedBox(height: 10),
               TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat Pemasangan'), validator: (val) => val!.isEmpty ? 'Wajib diisi' : null),
+              const SizedBox(height: 10),
               TextFormField(controller: _hpController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'No WhatsApp')),
-              
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
               DropdownButtonFormField(
+                dropdownColor: const Color(0xFF1E293B),
                 decoration: const InputDecoration(labelText: 'Pilih Paket Internet'),
-                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']})', style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => selectedPaket = val),
               ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _bulanTunggakanController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan / Tunggakan Awal'),
+                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tagihan Awal'),
               ),
 
               const SizedBox(height: 20),
-              const Text('Instalasi & Teknisi Lapangan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
-              const Divider(),
-              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi yang Bertugas')),
-              
+              const Text('Instalasi & Material Lapangan', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF06B6D4), fontSize: 15)),
+              const SizedBox(height: 10),
+              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi Bertugas')),
               const SizedBox(height: 10),
               DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Pilih Perangkat ONT yang Dipasang'),
+                dropdownColor: const Color(0xFF1E293B),
+                decoration: const InputDecoration(labelText: 'Perangkat ONT Dipasang'),
                 value: selectedOnt,
                 items: ontList.isEmpty 
-                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
-                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
+                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong', style: TextStyle(color: Colors.white)))]
+                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})', style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => selectedOnt = val),
               ),
-
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(child: TextFormField(controller: _dropcoreController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Kabel Dropcore (Meter)'))),
+                  Expanded(child: TextFormField(controller: _dropcoreController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Dropcore (Meter)'))),
                   const SizedBox(width: 10),
                   Expanded(child: TextFormField(controller: _patchcoreController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Patchcore (Pcs)'))),
                 ],
@@ -654,7 +829,12 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
               const SizedBox(height: 30),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFF06B6D4),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 onPressed: isSaving ? null : () async {
                   if (!_formKey.currentState!.validate() || selectedPaket == null) return;
                   setState(() => isSaving = true);
@@ -664,17 +844,11 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   int totalTunggakan = (hargaInt * jmlBulan * 1.11).round();
 
                   List materialPakai = [];
-                  if (selectedOnt != null) {
-                    materialPakai.add({"nama": selectedOnt, "qty": 1});
-                  }
+                  if (selectedOnt != null) materialPakai.add({"nama": selectedOnt, "qty": 1});
                   double dropcoreVal = double.tryParse(_dropcoreController.text) ?? 0;
-                  if (dropcoreVal > 0) {
-                    materialPakai.add({"nama": "Dropcore 1 Roll", "qty": dropcoreVal});
-                  }
+                  if (dropcoreVal > 0) materialPakai.add({"nama": "Dropcore 1 Roll", "qty": dropcoreVal});
                   int patchcoreVal = int.tryParse(_patchcoreController.text) ?? 0;
-                  if (patchcoreVal > 0) {
-                    materialPakai.add({"nama": "Patchcore", "qty": patchcoreVal});
-                  }
+                  if (patchcoreVal > 0) materialPakai.add({"nama": "Patchcore", "qty": patchcoreVal});
 
                   String materialStr = "ONT: ${selectedOnt ?? '-'}, Dropcore: ${_dropcoreController.text}m, Patchcore: ${_patchcoreController.text}pcs";
 
@@ -711,8 +885,10 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                     setState(() => isSaving = false);
                   }
                 },
-                icon: const Icon(Icons.save),
-                label: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Simpan Pelanggan & Potong Stok', style: TextStyle(fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.save_rounded),
+                label: isSaving 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
+                    : const Text('Simpan & Potong Stok', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ],
           ),
@@ -776,59 +952,70 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text('Upgrade & Perbaikan: ${widget.pelangganItem['nama']}')),
+      appBar: AppBar(title: Text('Upgrade: ${widget.pelangganItem['nama']}')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              const Text('Informasi & Ganti Paket / Tunggakan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 15)),
-              const Divider(),
+              const Text('Ganti Paket & Tunggakan', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF06B6D4), fontSize: 15)),
+              const SizedBox(height: 10),
               TextFormField(controller: _namaController, decoration: const InputDecoration(labelText: 'Nama Pelanggan')),
+              const SizedBox(height: 10),
               TextFormField(controller: _alamatController, decoration: const InputDecoration(labelText: 'Alamat')),
+              const SizedBox(height: 10),
               TextFormField(controller: _hpController, decoration: const InputDecoration(labelText: 'No WhatsApp')),
-              
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
               DropdownButtonFormField(
+                dropdownColor: const Color(0xFF1E293B),
                 decoration: const InputDecoration(labelText: 'Ganti Paket Internet'),
                 value: selectedPaketBaru,
-                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']} + PPN)'))).toList(),
+                items: daftarPaketGlobal.map((p) => DropdownMenuItem(value: p, child: Text('${p['nama']} (${p['harga']})', style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => selectedPaketBaru = val),
               ),
-
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _bulanController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Bulan Tunggakan / Tagihan'),
+                decoration: const InputDecoration(labelText: 'Bulan Tunggakan'),
               ),
+              const SizedBox(height: 10),
               DropdownButtonFormField(
+                dropdownColor: const Color(0xFF1E293B),
                 decoration: const InputDecoration(labelText: 'Status Tagihan'),
                 value: selectedStatus,
-                items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                items: ['Lunas', 'Belum Lunas'].map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => selectedStatus = val.toString()),
               ),
 
-              const SizedBox(height: 25),
-              const Text('Penanganan Gangguan & Perangkat', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orangeAccent, fontSize: 15)),
-              const Divider(),
-              
+              const SizedBox(height: 20),
+              const Text('Penanganan Gangguan & Perangkat', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3B82F6), fontSize: 15)),
+              const SizedBox(height: 10),
               DropdownButtonFormField(
-                decoration: const InputDecoration(labelText: 'Penggantian ONT Baru (Opsional)'),
+                dropdownColor: const Color(0xFF1E293B),
+                decoration: const InputDecoration(labelText: 'Ganti ONT Baru (Opsional)'),
                 value: selectedOntBaru,
                 items: ontList.isEmpty 
-                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong'))]
-                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})'))).toList(),
+                    ? [const DropdownMenuItem(value: null, child: Text('Stok ONT Kosong', style: TextStyle(color: Colors.white)))]
+                    : ontList.map((o) => DropdownMenuItem(value: o['nama_barang'].toString(), child: Text('${o['nama_barang']} (Sisa: ${o['jumlah']})', style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => selectedOntBaru = val),
               ),
-
-              TextFormField(controller: _snOntController, decoration: const InputDecoration(labelText: 'Serial Number (SN) ONT')),
-              TextFormField(controller: _gangguanController, decoration: const InputDecoration(labelText: 'Jenis Gangguan (Cth: Redaman Tinggi / Los)')),
-              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Nama Teknisi Perbaikan')),
+              const SizedBox(height: 10),
+              TextFormField(controller: _snOntController, decoration: const InputDecoration(labelText: 'SN ONT')),
+              const SizedBox(height: 10),
+              TextFormField(controller: _gangguanController, decoration: const InputDecoration(labelText: 'Jenis Gangguan (Redaman / LOS)')),
+              const SizedBox(height: 10),
+              TextFormField(controller: _teknisiController, decoration: const InputDecoration(labelText: 'Teknisi Perbaikan')),
 
               const SizedBox(height: 30),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 onPressed: isSaving ? null : () async {
                   if (!_formKey.currentState!.validate() || selectedPaketBaru == null) return;
                   setState(() => isSaving = true);
@@ -838,9 +1025,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                   int totalTagihanBaru = (hargaInt * jmlBulan * 1.11).round();
 
                   List materialPakai = [];
-                  if (selectedOntBaru != null) {
-                    materialPakai.add({"nama": selectedOntBaru, "qty": 1});
-                  }
+                  if (selectedOntBaru != null) materialPakai.add({"nama": selectedOntBaru, "qty": 1});
 
                   final payload = {
                     "action": "upgrade_dan_perbaikan",
@@ -872,8 +1057,10 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                     setState(() => isSaving = false);
                   }
                 },
-                icon: const Icon(Icons.save),
-                label: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Simpan Upgrade & Perbaikan', style: TextStyle(fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.save_rounded),
+                label: isSaving 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                    : const Text('Simpan Upgrade & Perbaikan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ],
           ),
@@ -907,49 +1094,47 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(
-          item['keterangan']?.toString() ?? 'Detail Pengeluaran',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(item['keterangan']?.toString() ?? 'Detail Pengeluaran', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Kategori   : ${item['kategori'] ?? '-'}'),
+              Text('Kategori : ${item['kategori'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
               const SizedBox(height: 5),
-              Text('Nominal    : Rp ${item['nominal'] ?? '0'}'),
+              Text('Nominal  : Rp ${item['nominal'] ?? '0'}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
-              Text('Tanggal    : ${item['tanggal'] ?? '-'}'),
+              Text('Tanggal  : ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
               if (item['jumlah_stok'] != null && item['jumlah_stok'].toString().isNotEmpty) ...[
                 const SizedBox(height: 5),
-                Text('Qty Stok   : ${item['jumlah_stok']} ${item['satuan_stok'] ?? ''}'),
+                Text('Qty Stok : ${item['jumlah_stok']} ${item['satuan_stok'] ?? ''}', style: const TextStyle(color: Color(0xFF06B6D4))),
               ],
             ],
           ),
         ),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
             onPressed: () {
               Navigator.pop(dialogContext);
               _confirmHapusPengeluaran(item);
             },
-            icon: const Icon(Icons.delete, size: 18),
+            icon: const Icon(Icons.delete_outline, size: 18),
             label: const Text('Hapus'),
           ),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(dialogContext);
               _showFormPengeluaranDialog(itemEdit: item);
             },
-            icon: const Icon(Icons.edit, size: 18),
+            icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Tutup'),
+            child: const Text('Tutup', style: TextStyle(color: Color(0xFF94A3B8))),
           ),
         ],
       ),
@@ -960,12 +1145,13 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Konfirmasi Hapus'),
-        content: Text('Yakin ingin menghapus pengeluaran "${item['keterangan']}"?'),
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Konfirmasi Hapus', style: TextStyle(color: Colors.white)),
+        content: Text('Yakin ingin menghapus pengeluaran "${item['keterangan']}"?', style: const TextStyle(color: Color(0xFFCBD5E1))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
               final payload = {
@@ -995,41 +1181,19 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
 
   void _showFormPengeluaranDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
-    final TextEditingController keteranganController = TextEditingController(
-      text: isEdit ? (itemEdit['keterangan']?.toString() ?? '') : '',
-    );
-    final TextEditingController nominalController = TextEditingController(
-      text: isEdit ? (itemEdit['nominal']?.toString() ?? '') : '',
-    );
-
+    final TextEditingController keteranganController = TextEditingController(text: isEdit ? (itemEdit['keterangan']?.toString() ?? '') : '');
+    final TextEditingController nominalController = TextEditingController(text: isEdit ? (itemEdit['nominal']?.toString() ?? '') : '');
     final TextEditingController coreFoController = TextEditingController(text: '2');
     final TextEditingController rollFoController = TextEditingController(text: '1');
     final TextEditingController meterPerRollController = TextEditingController(text: '1000');
+    final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok']?.toString() ?? '1') : '1');
+    final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok']?.toString() ?? 'Pcs') : 'Pcs');
 
-    final TextEditingController jumlahStokController = TextEditingController(
-      text: isEdit ? (itemEdit['jumlah_stok']?.toString() ?? '1') : '1',
-    );
-    final TextEditingController satuanStokController = TextEditingController(
-      text: isEdit ? (itemEdit['satuan_stok']?.toString() ?? 'Pcs') : 'Pcs',
-    );
-
-    final List<String> kategoriList = [
-      'Belanja Aset',
-      'Operasional',
-      'Gaji Karyawan',
-      'Hutang',
-      'Donasi Sosial',
-      'Maintenance / Pemeliharaan',
-      'Penarikan Jalur FO'
-    ];
-
+    final List<String> kategoriList = ['Belanja Aset', 'Operasional', 'Gaji Karyawan', 'Hutang', 'Donasi Sosial', 'Maintenance / Pemeliharaan', 'Penarikan Jalur FO'];
     final List<String> jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
 
     String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Operasional').trim() : 'Operasional';
-    if (!kategoriList.contains(selectedKategori)) {
-      selectedKategori = 'Operasional';
-    }
-
+    if (!kategoriList.contains(selectedKategori)) selectedKategori = 'Operasional';
     String selectedJenisAset = 'ONT';
 
     showDialog(
@@ -1041,41 +1205,44 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
             bool isFO = isBelanjaAset && selectedJenisAset == 'FO';
 
             return AlertDialog(
-              title: Text(isEdit ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'),
+              backgroundColor: const Color(0xFF1E293B),
+              title: Text(isEdit ? 'Edit Pengeluaran' : 'Tambah Pengeluaran', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
-                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
+                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat, style: const TextStyle(color: Colors.white)))).toList(),
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
                     if (isBelanjaAset) ...[
                       DropdownButtonFormField<String>(
+                        dropdownColor: const Color(0xFF1E293B),
                         decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
                         value: selectedJenisAset,
-                        items: jenisAsetList.map((j) => DropdownMenuItem(value: j, child: Text(j))).toList(),
+                        items: jenisAsetList.map((j) => DropdownMenuItem(value: j, child: Text(j, style: const TextStyle(color: Colors.white)))).toList(),
                         onChanged: (val) => setDialogState(() => selectedJenisAset = val.toString()),
                       ),
                       const SizedBox(height: 10),
                     ],
                     TextField(
                       controller: keteranganController,
-                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat Aset' : 'Keterangan Pengeluaran'),
+                      decoration: InputDecoration(labelText: isBelanjaAset ? 'Nama / Merek Perangkat' : 'Keterangan Pengeluaran'),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: nominalController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Total Nominal Biaya (Rp)'),
+                      decoration: const InputDecoration(labelText: 'Total Biaya (Rp)'),
                     ),
                     if (isBelanjaAset) ...[
                       const SizedBox(height: 15),
-                      const Divider(),
-                      const Text('Konfigurasi Stok Gudang Otomatis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                      const Divider(color: Color(0xFF334155)),
+                      const Text('Konfigurasi Stok Gudang:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF06B6D4))),
                       const SizedBox(height: 8),
                       if (isFO) ...[
                         Row(
@@ -1086,11 +1253,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        TextField(
-                          controller: meterPerRollController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Meter Per Roll'),
-                        ),
+                        TextField(controller: meterPerRollController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Meter Per Roll')),
                       ] else ...[
                         Row(
                           children: [
@@ -1105,8 +1268,9 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), foregroundColor: Colors.black),
                   onPressed: () async {
                     if (nominalController.text.isEmpty) return;
 
@@ -1118,8 +1282,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       if (isFO) {
                         int rolls = int.tryParse(rollFoController.text) ?? 1;
                         int meters = int.tryParse(meterPerRollController.text) ?? 1000;
-                        int totalMeter = rolls * meters;
-                        finalJumlahStok = totalMeter.toString();
+                        finalJumlahStok = (rolls * meters).toString();
                         finalSatuanStok = 'Meter';
                         namaBarangFinal = 'Kabel FO ${coreFoController.text} Core ($rolls Roll x $meters Meter)';
                       } else {
@@ -1152,7 +1315,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       // ignore
                     }
                   },
-                  child: const Text('Simpan'),
+                  child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -1166,35 +1329,44 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Pengeluaran (${widget.pengeluaran.length})'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)],
+        title: Row(
+          children: [
+            const Icon(Icons.receipt_long_rounded, color: Color(0xFFEF4444), size: 24),
+            const SizedBox(width: 10),
+            Text('Pengeluaran (${widget.pengeluaran.length})'),
+          ],
+        ),
+        actions: [IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF06B6D4)), onPressed: widget.onRefresh)],
       ),
       body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
           : widget.pengeluaran.isEmpty
-              ? const Center(child: Text('Belum ada data pengeluaran.'))
+              ? const Center(child: Text('Belum ada data pengeluaran.', style: TextStyle(color: Color(0xFF94A3B8))))
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: widget.pengeluaran.length,
                   itemBuilder: (context, index) {
                     final item = widget.pengeluaran[index];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
                       child: ListTile(
                         onTap: () => _showPengeluaranDetailDialog(item),
-                        leading: const Icon(Icons.money_off, color: Colors.red),
-                        title: Text(item['keterangan']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}\nTgl: ${item['tanggal'] ?? '-'}'),
-                        trailing: Text(
-                          'Rp ${item['nominal'] ?? '0'}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.rose.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.arrow_downward_rounded, color: Colors.roseAccent),
                         ),
+                        title: Text(item['keterangan']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        subtitle: Text('${item['kategori'] ?? '-'} • ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.roseAccent, fontSize: 14)),
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add),
+        label: const Text('Pengeluaran', style: TextStyle(fontWeight: FontWeight.bold)),
         onPressed: () => _showFormPengeluaranDialog(),
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -1222,47 +1394,43 @@ class _StokBarangPageState extends State<StokBarangPage> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(
-          item['nama_barang']?.toString() ?? 'Detail Barang',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(item['nama_barang']?.toString() ?? 'Detail Barang', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Nama Barang : ${item['nama_barang'] ?? '-'}'),
+              Text('Kategori   : ${item['kategori'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
               const SizedBox(height: 5),
-              Text('Kategori    : ${item['kategori'] ?? '-'}'),
+              Text('Sisa Stok  : ${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(color: Color(0xFF06B6D4), fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
-              Text('Sisa Stok   : ${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}'),
-              const SizedBox(height: 5),
-              Text('Keterangan  : ${item['keterangan'] ?? '-'}'),
+              Text('Keterangan : ${item['keterangan'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
             ],
           ),
         ),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
             onPressed: () {
               Navigator.pop(dialogContext);
               _confirmHapusStok(item);
             },
-            icon: const Icon(Icons.delete, size: 18),
+            icon: const Icon(Icons.delete_outline, size: 18),
             label: const Text('Hapus'),
           ),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(dialogContext);
               _showFormStokDialog(itemEdit: item);
             },
-            icon: const Icon(Icons.edit, size: 18),
+            icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Tutup'),
+            child: const Text('Tutup', style: TextStyle(color: Color(0xFF94A3B8))),
           ),
         ],
       ),
@@ -1273,12 +1441,13 @@ class _StokBarangPageState extends State<StokBarangPage> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Konfirmasi Hapus'),
-        content: Text('Yakin ingin menghapus barang "${item['nama_barang']}" dari stok?'),
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Konfirmasi Hapus', style: TextStyle(color: Colors.white)),
+        content: Text('Yakin ingin menghapus barang "${item['nama_barang']}" dari stok?', style: const TextStyle(color: Color(0xFFCBD5E1))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
               final payload = {
@@ -1308,68 +1477,19 @@ class _StokBarangPageState extends State<StokBarangPage> {
 
   void _showFormStokDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
-
-    final List<String> kategoriList = [
-      'Belanja Aset',
-      'ONT/Perangkat',
-      'Kabel FO',
-      'Aksesoris Jaringan',
-      'Tools & Peralatan',
-      'Operasional',
-      'Lainnya'
-    ];
-
-    final List<String> jenisBarangList = [
-      'ONT',
-      'OLT',
-      'FO',
-      'STB',
-      'Patchcore',
-      'Protect',
-      'Tools',
-      'Aksesoris',
-      'Umum'
-    ];
+    final List<String> kategoriList = ['Belanja Aset', 'ONT/Perangkat', 'Kabel FO', 'Aksesoris Jaringan', 'Tools & Peralatan', 'Operasional', 'Lainnya'];
+    final List<String> jenisBarangList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris', 'Umum'];
 
     String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Belanja Aset').trim() : 'Belanja Aset';
-    if (!kategoriList.contains(selectedKategori)) {
-      if (selectedKategori.isNotEmpty) {
-        kategoriList.add(selectedKategori);
-      } else {
-        selectedKategori = 'Belanja Aset';
-      }
-    }
+    if (!kategoriList.contains(selectedKategori)) kategoriList.add(selectedKategori);
 
     String selectedJenis = isEdit ? (itemEdit['jenis_barang']?.toString() ?? 'ONT').trim() : 'ONT';
-    if (isEdit && itemEdit['jenis_barang'] == null) {
-      String nama = itemEdit['nama_barang']?.toString() ?? '';
-      for (var j in jenisBarangList) {
-        if (nama.toLowerCase().contains(j.toLowerCase())) {
-          selectedJenis = j;
-          break;
-        }
-      }
-    }
-    if (!jenisBarangList.contains(selectedJenis)) {
-      if (selectedJenis.isNotEmpty) {
-        jenisBarangList.add(selectedJenis);
-      } else {
-        selectedJenis = 'ONT';
-      }
-    }
+    if (!jenisBarangList.contains(selectedJenis)) jenisBarangList.add(selectedJenis);
 
-    final TextEditingController namaController = TextEditingController(
-      text: isEdit ? (itemEdit['nama_barang']?.toString() ?? '') : '',
-    );
-    final TextEditingController jumlahController = TextEditingController(
-      text: isEdit ? (itemEdit['jumlah']?.toString() ?? '1') : '1',
-    );
-    final TextEditingController satuanController = TextEditingController(
-      text: isEdit ? (itemEdit['satuan']?.toString() ?? 'Pcs') : 'Pcs',
-    );
-    final TextEditingController ketController = TextEditingController(
-      text: isEdit ? (itemEdit['keterangan']?.toString() ?? 'Stok Gudang') : 'Stok Gudang',
-    );
+    final TextEditingController namaController = TextEditingController(text: isEdit ? (itemEdit['nama_barang']?.toString() ?? '') : '');
+    final TextEditingController jumlahController = TextEditingController(text: isEdit ? (itemEdit['jumlah']?.toString() ?? '1') : '1');
+    final TextEditingController satuanController = TextEditingController(text: isEdit ? (itemEdit['satuan']?.toString() ?? 'Pcs') : 'Pcs');
+    final TextEditingController ketController = TextEditingController(text: isEdit ? (itemEdit['keterangan']?.toString() ?? 'Stok Gudang') : 'Stok Gudang');
 
     showDialog(
       context: context,
@@ -1377,61 +1497,46 @@ class _StokBarangPageState extends State<StokBarangPage> {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual'),
+              backgroundColor: const Color(0xFF1E293B),
+              title: Text(isEdit ? 'Edit Stok Barang' : 'Tambah Stok Gudang Manual', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
-                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat))).toList(),
+                      items: kategoriList.map((kat) => DropdownMenuItem(value: kat, child: Text(kat, style: const TextStyle(color: Colors.white)))).toList(),
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
                       value: selectedJenis,
-                      items: jenisBarangList.map((j) => DropdownMenuItem(value: j, child: Text(j))).toList(),
+                      items: jenisBarangList.map((j) => DropdownMenuItem(value: j, child: Text(j, style: const TextStyle(color: Colors.white)))).toList(),
                       onChanged: (val) => setDialogState(() => selectedJenis = val.toString()),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: namaController,
-                      decoration: const InputDecoration(labelText: 'Nama / Merek Barang'),
-                    ),
+                    TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama / Merek Barang')),
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: jumlahController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Jumlah / Qty'),
-                          ),
-                        ),
+                        Expanded(flex: 2, child: TextField(controller: jumlahController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Qty'))),
                         const SizedBox(width: 10),
-                        Expanded(
-                          flex: 1,
-                          child: TextField(
-                            controller: satuanController,
-                            decoration: const InputDecoration(labelText: 'Satuan (Pcs / Meter / Roll)'),
-                          ),
-                        ),
+                        Expanded(flex: 1, child: TextField(controller: satuanController, decoration: const InputDecoration(labelText: 'Satuan'))),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: ketController,
-                      decoration: const InputDecoration(labelText: 'Keterangan'),
-                    ),
+                    TextField(controller: ketController, decoration: const InputDecoration(labelText: 'Keterangan')),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), foregroundColor: Colors.black),
                   onPressed: () async {
                     if (namaController.text.isEmpty || jumlahController.text.isEmpty) return;
                     final payload = {
@@ -1458,7 +1563,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                       // ignore
                     }
                   },
-                  child: const Text('Simpan'),
+                  child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -1472,38 +1577,48 @@ class _StokBarangPageState extends State<StokBarangPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Stok Barang Jaringan (${widget.stok.length})'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)
-        ],
+        title: Row(
+          children: [
+            const Icon(Icons.inventory_2_rounded, color: Color(0xFF06B6D4), size: 24),
+            const SizedBox(width: 10),
+            Text('Stok Gudang (${widget.stok.length})'),
+          ],
+        ),
+        actions: [IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF06B6D4)), onPressed: widget.onRefresh)],
       ),
       body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
           : widget.stok.isEmpty
-              ? const Center(child: Text('Belum ada stok barang.'))
+              ? const Center(child: Text('Belum ada stok barang.', style: TextStyle(color: Color(0xFF94A3B8))))
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: widget.stok.length,
                   itemBuilder: (context, index) {
                     final item = widget.stok[index];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
                       child: ListTile(
                         onTap: () => _showStokDetailDialog(item),
-                        leading: const Icon(Icons.router, color: Colors.indigo),
-                        title: Text(item['nama_barang']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}'),
-                        trailing: Text(
-                          '${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.router_outlined, color: Color(0xFF3B82F6)),
+                        ),
+                        title: Text(item['nama_barang']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        subtitle: Text('Kategori: ${item['kategori'] ?? '-'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: const Color(0xFF06B6D4).withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                          child: Text('${item['jumlah'] ?? '0'} ${item['satuan'] ?? 'Pcs'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF06B6D4), fontSize: 12)),
                         ),
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add),
+        label: const Text('Stok Barang', style: TextStyle(fontWeight: FontWeight.bold)),
         onPressed: () => _showFormStokDialog(),
-        child: const Icon(Icons.add),
-        tooltip: 'Tambah Stok Barang',
       ),
     );
   }
@@ -1525,20 +1640,18 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Konfirmasi Hapus'),
-        content: Text('Yakin ingin menghapus paket "${item['nama']}"?'),
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Konfirmasi Hapus', style: TextStyle(color: Colors.white)),
+        content: Text('Yakin ingin menghapus paket "${item['nama']}"?', style: const TextStyle(color: Color(0xFFCBD5E1))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
-              
-              // Hapus secara lokal
               setState(() {
                 daftarPaketGlobal.removeAt(index);
               });
-
               final payload = {
                 "action": "hapus_paket",
                 "index": index,
@@ -1574,7 +1687,8 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              title: Text(isEdit ? 'Edit Paket Internet' : 'Tambah Paket Internet Baru'),
+              backgroundColor: const Color(0xFF1E293B),
+              title: Text(isEdit ? 'Edit Paket Internet' : 'Tambah Paket Baru', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1592,64 +1706,60 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
               actions: [
                 if (isEdit)
                   TextButton.icon(
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    onPressed: isSaving
-                        ? null
-                        : () {
-                            Navigator.pop(dialogContext);
-                            _confirmHapusPaket(indexEdit!, itemEdit);
-                          },
-                    icon: const Icon(Icons.delete, size: 16),
+                    style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
+                    onPressed: isSaving ? null : () {
+                      Navigator.pop(dialogContext);
+                      _confirmHapusPaket(indexEdit!, itemEdit);
+                    },
+                    icon: const Icon(Icons.delete_outline, size: 16),
                     label: const Text('Hapus'),
                   ),
                 TextButton(
                   onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
-                  child: const Text('Batal'),
+                  child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8))),
                 ),
                 ElevatedButton(
-                  onPressed: isSaving
-                      ? null
-                      : () async {
-                          if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
-                          setDialogState(() => isSaving = true);
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), foregroundColor: Colors.black),
+                  onPressed: isSaving ? null : () async {
+                    if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
+                    setDialogState(() => isSaving = true);
 
-                          final newPaket = {
-                            "nama": namaController.text,
-                            "harga": hargaController.text,
-                          };
+                    final newPaket = {
+                      "nama": namaController.text,
+                      "harga": hargaController.text,
+                    };
 
-                          // Perbarui memori lokal secara langsung
-                          this.setState(() {
-                            if (isEdit && indexEdit != null) {
-                              daftarPaketGlobal[indexEdit] = newPaket;
-                            } else {
-                              daftarPaketGlobal.add(newPaket);
-                            }
-                          });
+                    this.setState(() {
+                      if (isEdit && indexEdit != null) {
+                        daftarPaketGlobal[indexEdit] = newPaket;
+                      } else {
+                        daftarPaketGlobal.add(newPaket);
+                      }
+                    });
 
-                          final payload = {
-                            "action": isEdit ? "edit_paket" : "tambah_paket",
-                            "index": indexEdit,
-                            "nama": namaController.text,
-                            "harga": hargaController.text,
-                          };
+                    final payload = {
+                      "action": isEdit ? "edit_paket" : "tambah_paket",
+                      "index": indexEdit,
+                      "nama": namaController.text,
+                      "harga": hargaController.text,
+                    };
 
-                          Navigator.pop(dialogContext);
+                    Navigator.pop(dialogContext);
 
-                          try {
-                            await http.post(
-                              Uri.parse(scriptUrl),
-                              headers: {"Content-Type": "application/json"},
-                              body: json.encode(payload),
-                            );
-                            widget.onRefresh();
-                          } catch (e) {
-                            // ignore
-                          }
-                        },
+                    try {
+                      await http.post(
+                        Uri.parse(scriptUrl),
+                        headers: {"Content-Type": "application/json"},
+                        body: json.encode(payload),
+                      );
+                      widget.onRefresh();
+                    } catch (e) {
+                      // ignore
+                    }
+                  },
                   child: isSaving
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Simpan'),
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                      : const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -1663,37 +1773,48 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Daftar Paket Internet (${daftarPaketGlobal.length})'),
+        title: Row(
+          children: [
+            const Icon(Icons.wifi_tethering_rounded, color: Color(0xFF06B6D4), size: 24),
+            const SizedBox(width: 10),
+            Text('Daftar Paket (${daftarPaketGlobal.length})'),
+          ],
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh),
+          IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF06B6D4)), onPressed: widget.onRefresh),
         ],
       ),
       body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
           : daftarPaketGlobal.isEmpty
-              ? const Center(child: Text('Belum ada paket internet tersimpan.'))
+              ? const Center(child: Text('Belum ada paket internet tersimpan.', style: TextStyle(color: Color(0xFF94A3B8))))
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: daftarPaketGlobal.length,
                   itemBuilder: (context, index) {
                     final paket = daftarPaketGlobal[index];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
                       child: ListTile(
-                        leading: const Icon(Icons.wifi, color: Colors.blueAccent),
-                        title: Text(paket['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Tarif: ${paket['harga']} (+ PPN 11%)'),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: const Color(0xFF06B6D4).withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.speed_rounded, color: Color(0xFF06B6D4)),
+                        ),
+                        title: Text(paket['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
+                        subtitle: Text('Tarif: ${paket['harga']} (+ PPN 11%)', style: const TextStyle(color: Color(0xFF94A3B8))),
                         trailing: IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF3B82F6)),
                           onPressed: () => _showFormPaketDialog(itemEdit: paket, indexEdit: index),
                         ),
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add),
+        label: const Text('Tambah Paket', style: TextStyle(fontWeight: FontWeight.bold)),
         onPressed: () => _showFormPaketDialog(),
-        child: const Icon(Icons.add),
-        tooltip: 'Tambah Paket Baru',
       ),
     );
   }
@@ -1945,52 +2066,107 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     final int labaBersih = totalPemasukanLunas - totalPengeluaran;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Keuangan'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh)]),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Icon(Icons.analytics_rounded, color: Color(0xFF06B6D4), size: 24),
+            const SizedBox(width: 10),
+            const Text('Dashboard Analytics'),
+          ],
+        ),
+        actions: [IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF06B6D4)), onPressed: widget.onRefresh)],
+      ),
       body: widget.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Periode Rekap:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ToggleButtons(
-                      isSelected: [selectedPeriode == 'Bulanan', selectedPeriode == 'Tahunan'],
-                      onPressed: (index) => setState(() => selectedPeriode = index == 0 ? 'Bulanan' : 'Tahunan'),
-                      borderRadius: BorderRadius.circular(8),
-                      constraints: const BoxConstraints(minHeight: 32, minWidth: 90),
-                      children: const [Text('Bulanan', style: TextStyle(fontSize: 12)), Text('Tahunan', style: TextStyle(fontSize: 12))],
+                    const Text('Periode Rekap:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                    Container(
+                      decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+                      child: ToggleButtons(
+                        isSelected: [selectedPeriode == 'Bulanan', selectedPeriode == 'Tahunan'],
+                        onPressed: (index) => setState(() => selectedPeriode = index == 0 ? 'Bulanan' : 'Tahunan'),
+                        borderRadius: BorderRadius.circular(10),
+                        selectedColor: Colors.black,
+                        fillColor: const Color(0xFF06B6D4),
+                        color: const Color(0xFF94A3B8),
+                        constraints: const BoxConstraints(minHeight: 36, minWidth: 80),
+                        children: const [Text('Bulanan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), Text('Tahunan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: _cetakLaporanPdf,
-                  icon: const Icon(Icons.print),
-                  label: Text('Cetak Laporan Lengkap $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.print_rounded),
+                  label: Text('Cetak Laporan $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 16),
+                _buildStatCard('Pemasukan Lunas', 'Rp $totalPemasukanLunas', Colors.emeraldAccent, Icons.trending_up_rounded),
+                const SizedBox(height: 10),
+                _buildStatCard('Total Piutang / Tunggakan', 'Rp $totalTunggakanPelanggan', Colors.amberAccent, Icons.pending_actions_rounded),
+                const SizedBox(height: 10),
+                _buildStatCard('Total Pengeluaran', 'Rp $totalPengeluaran', Colors.roseAccent, Icons.trending_down_rounded),
+                const SizedBox(height: 16),
                 Card(
+                  color: const Color(0xFF0F172A),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: labaBersih >= 0 ? const Color(0xFF06B6D4) : Colors.rose, width: 1.5),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total Pemasukan (Lunas): Rp $totalPemasukanLunas', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
-                        const SizedBox(height: 8),
-                        Text('Total Piutang/Tunggakan: Rp $totalTunggakanPelanggan', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange)),
-                        const SizedBox(height: 8),
-                        Text('Total Pengeluaran: Rp $totalPengeluaran', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red)),
-                        const Divider(),
-                        Text('Laba / Rugi Bersih: Rp $labaBersih', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? Colors.blue : Colors.orange)),
+                        Text('LABA / RUGI BERSIH', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8), letterSpacing: 1)),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Rp $labaBersih',
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? const Color(0xFF06B6D4) : Colors.roseAccent),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String amount, Color color, IconData icon) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                const SizedBox(height: 2),
+                Text(amount, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
