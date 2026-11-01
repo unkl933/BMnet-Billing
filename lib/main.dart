@@ -130,13 +130,28 @@ Map<String, dynamic> op(String sheet, String o, Map<String, dynamic> d) =>
 Map<String, dynamic> adj(String id, num delta) => op('Stok', 'adjust', {'id': id, 'delta': delta});
 
 class Api {
-  static Future<Map<String, dynamic>> get() async {
+    static Future> get() async {
     if (Cfg.scriptUrl.startsWith('PASTE')) throw 'Isi Cfg.scriptUrl dengan URL Web App Apps Script';
-    final r = await http
-        .get(Uri.parse('${Cfg.scriptUrl}?action=all&token=${Uri.encodeComponent(Cfg.token)}'))
-        .timeout(const Duration(seconds: 40));
-    return jsonDecode(r.body) as Map<String, dynamic>;
+    
+    final client = http.Client();
+    try {
+      // Menambahkan cache-buster (cb) menggunakan timestamp agar Google membaca data terbaru
+      final url = '${Cfg.scriptUrl}?action=all&token=${Uri.encodeComponent(Cfg.token)}&cb=${DateTime.now().millisecondsSinceEpoch}';
+      
+      final req = http.Request('GET', Uri.parse(url))..followRedirects = false;
+      var res = await http.Response.fromStream(await client.send(req).timeout(const Duration(seconds: 40)));
+      
+      // Menangani HTTP 302 Redirect secara eksplisit seperti pada method POST
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers['location'] != null) {
+        res = await http.get(Uri.parse(res.headers['location']!));
+      }
+      
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } finally {
+      client.close();
+    }
   }
+
 
   static Future<Map<String, dynamic>> post(Map<String, dynamic> body) async {
     final client = http.Client();
