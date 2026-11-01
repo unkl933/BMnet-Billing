@@ -1,5 +1,5 @@
 name: bm_network
-description: BM Network Ops - Modul Billing
+description: BM Network - Modul Billing
 publish_to: "none"
 version: 1.0.0+1
 
@@ -14,6 +14,7 @@ dependencies:
   fl_chart: ^1.0.0
   pdf: ^3.11.3
   printing: ^5.14.2
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
