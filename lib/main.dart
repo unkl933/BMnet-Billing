@@ -18,7 +18,7 @@ const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Deklarasi aman dengan List polos (Bebas dari bentrokan tipe data)
+// Deklarasi aman dengan List polos
 List daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -123,7 +123,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       if (response.statusCode == 200 || response.statusCode == 302) {
         final decoded = json.decode(response.body);
         if (decoded is Map) {
-          // 1. Normalisasi Key Data Pelanggan
+          // 1. Normalisasi Pelanggan
           List rawPelanggan = decoded['pelanggan'] ?? [];
           List listPelanggan = rawPelanggan.map((item) {
             return {
@@ -143,32 +143,45 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             };
           }).toList();
 
-          // 2. Normalisasi Key Data Pengeluaran
+          // 2. Normalisasi Pengeluaran (Menangani variasi nama header Spreadsheet)
           List rawPengeluaran = decoded['pengeluaran'] ?? [];
           List listPengeluaran = rawPengeluaran.map((item) {
+            String tgl = (item['tanggal'] ?? item['Tanggal'] ?? item['TANGGAL'] ?? '').toString().trim();
+            String kat = (item['kategori'] ?? item['Kategori'] ?? item['KATEGORI'] ?? '').toString().trim();
+            String ket = (item['keterangan'] ?? item['Keterangan'] ?? item['KETERANGAN'] ?? item['Nama Barang'] ?? item['Nama'] ?? item['Deskripsi'] ?? item['Item'] ?? '').toString().trim();
+            String nom = (item['nominal'] ?? item['Nominal'] ?? item['NOMINAL'] ?? item['Biaya'] ?? '0').toString().trim();
+            String jStok = (item['jumlah_stok'] ?? item['Jumlah Stok'] ?? item['Jumlah_Stok'] ?? '').toString().trim();
+            String sStok = (item['satuan_stok'] ?? item['Satuan Stok'] ?? item['Satuan_Stok'] ?? '').toString().trim();
+
             return {
-              'tanggal': (item['tanggal'] ?? item['Tanggal'] ?? '').toString(),
-              'kategori': (item['kategori'] ?? item['Kategori'] ?? '-').toString(),
-              'keterangan': (item['keterangan'] ?? item['Keterangan'] ?? '-').toString(),
-              'nominal': (item['nominal'] ?? item['Nominal'] ?? '0').toString(),
-              'jumlah_stok': (item['jumlah_stok'] ?? item['Jumlah Stok'] ?? item['Jumlah_Stok'] ?? '').toString(),
-              'satuan_stok': (item['satuan_stok'] ?? item['Satuan Stok'] ?? item['Satuan_Stok'] ?? '').toString(),
+              'tanggal': tgl.isEmpty ? '-' : tgl,
+              'kategori': kat.isEmpty ? 'Operasional' : kat,
+              'keterangan': ket.isEmpty ? '-' : ket,
+              'nominal': nom.isEmpty ? '0' : nom,
+              'jumlah_stok': jStok,
+              'satuan_stok': sStok,
             };
           }).toList();
 
-          // 3. Normalisasi Key Data Stok
+          // 3. Normalisasi Stok
           List rawStok = decoded['stok'] ?? [];
           List listStok = rawStok.map((item) {
+            String nm = (item['nama_barang'] ?? item['Nama Barang'] ?? item['Nama_Barang'] ?? item['Nama'] ?? item['Barang'] ?? '').toString().trim();
+            String kat = (item['kategori'] ?? item['Kategori'] ?? item['KATEGORI'] ?? '').toString().trim();
+            String jml = (item['jumlah'] ?? item['Jumlah'] ?? item['JUMLAH'] ?? '0').toString().trim();
+            String sat = (item['satuan'] ?? item['Satuan'] ?? item['SATUAN'] ?? 'Pcs').toString().trim();
+            String ket = (item['keterangan'] ?? item['Keterangan'] ?? item['KETERANGAN'] ?? '').toString().trim();
+
             return {
-              'nama_barang': (item['nama_barang'] ?? item['Nama Barang'] ?? item['Nama_Barang'] ?? item['Nama'] ?? '-').toString(),
-              'kategori': (item['kategori'] ?? item['Kategori'] ?? '-').toString(),
-              'jumlah': (item['jumlah'] ?? item['Jumlah'] ?? '0').toString(),
-              'satuan': (item['satuan'] ?? item['Satuan'] ?? 'Pcs').toString(),
-              'keterangan': (item['keterangan'] ?? item['Keterangan'] ?? '-').toString(),
+              'nama_barang': nm.isEmpty ? '-' : nm,
+              'kategori': kat.isEmpty ? '-' : kat,
+              'jumlah': jml.isEmpty ? '0' : jml,
+              'satuan': sat.isEmpty ? 'Pcs' : sat,
+              'keterangan': ket.isEmpty ? '-' : ket,
             };
           }).toList();
 
-          // 4. Normalisasi Key Data Paket
+          // 4. Normalisasi Paket
           if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
             List listPaketBaru = [];
             for (var item in (decoded['paket'] as List)) {
@@ -188,15 +201,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           });
         } else {
           setState(() => isLoading = false);
-          _showErrorSnackBar('Format data dari Apps Script tidak sesuai (Bukan JSON Object)');
+          _showErrorSnackBar('Format data Google Apps Script tidak valid');
         }
       } else {
         setState(() => isLoading = false);
-        _showErrorSnackBar('Gagal terhubung ke Apps Script (Status HTTP: ${response.statusCode})');
+        _showErrorSnackBar('Gagal terhubung ke Apps Script (HTTP Status: ${response.statusCode})');
       }
     } catch (e) {
       setState(() => isLoading = false);
-      _showErrorSnackBar('Gagal memuat data dari Apps Script: $e');
+      _showErrorSnackBar('Error koneksi Apps Script: $e');
     }
   }
 
@@ -657,7 +670,7 @@ class BillingHomePage extends StatelessWidget {
                         onRefresh();
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Gagal simpan pembayaran: Status HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                          SnackBar(content: Text('Gagal simpan pembayaran: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
                         );
                       }
                     } catch (e) {
@@ -1261,6 +1274,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 "action": "hapus_pengeluaran",
                 "index": widget.pengeluaran.indexOf(item),
                 "keterangan": item['keterangan'],
+                "Keterangan": item['keterangan'],
               };
               try {
                 final response = await http.post(
@@ -1389,7 +1403,10 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
 
                     String finalJumlahStok = jumlahStokController.text;
                     String finalSatuanStok = satuanStokController.text;
-                    String namaBarangFinal = keteranganController.text;
+                    String inputNama = keteranganController.text.trim();
+                    if (inputNama.isEmpty) inputNama = isBelanjaAset ? selectedJenisAset : selectedKategori;
+
+                    String namaBarangFinal = inputNama;
 
                     if (isBelanjaAset) {
                       if (isFO) {
@@ -1399,19 +1416,30 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                         finalSatuanStok = 'Meter';
                         namaBarangFinal = 'Kabel FO ${coreFoController.text} Core ($rolls Roll x $meters Meter)';
                       } else {
-                        namaBarangFinal = '[$selectedJenisAset] ${keteranganController.text}';
+                        namaBarangFinal = inputNama.startsWith('[') ? inputNama : '[$selectedJenisAset] $inputNama';
                       }
                     }
 
+                    String tglFinal = isEdit ? (itemEdit['tanggal']?.toString() ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0];
+
+                    // DUAL-KEY PAYLOAD: Mengirim key kapital & kecil sekaligus agar pasti cocok dengan Apps Script
                     final payload = {
                       "action": isEdit ? "edit_pengeluaran" : "tambah_pengeluaran",
                       "index": isEdit ? widget.pengeluaran.indexOf(itemEdit) : null,
                       "kategori": selectedKategori,
+                      "Kategori": selectedKategori,
                       "keterangan": namaBarangFinal,
+                      "Keterangan": namaBarangFinal,
+                      "nama_barang": namaBarangFinal,
+                      "Nama Barang": namaBarangFinal,
                       "nominal": nominalController.text,
+                      "Nominal": nominalController.text,
                       "jumlah_stok": finalJumlahStok,
+                      "Jumlah Stok": finalJumlahStok,
                       "satuan_stok": finalSatuanStok,
-                      "tanggal": isEdit ? (itemEdit['tanggal']?.toString() ?? DateTime.now().toString().split(' ')[0]) : DateTime.now().toString().split(' ')[0],
+                      "Satuan Stok": finalSatuanStok,
+                      "tanggal": tglFinal,
+                      "Tanggal": tglFinal,
                     };
 
                     Navigator.pop(dialogContext);
@@ -1479,8 +1507,13 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                           decoration: BoxDecoration(color: colorRose.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
                           child: const Icon(Icons.arrow_downward_rounded, color: colorRoseAccent),
                         ),
-                        title: Text(item['keterangan']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        subtitle: Text('${item['kategori'] ?? '-'} • ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        title: Text(
+                          (item['keterangan'] != null && item['keterangan'].toString().trim().isNotEmpty)
+                              ? item['keterangan'].toString()
+                              : 'Pengeluaran Tanpa Nama',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        subtitle: Text('${item['kategori'] ?? 'Operasional'} • ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                         trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: colorRoseAccent, fontSize: 14)),
                       ),
                     );
@@ -1577,6 +1610,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                 "action": "hapus_stok",
                 "index": widget.stok.indexOf(item),
                 "nama_barang": item['nama_barang'],
+                "Nama Barang": item['nama_barang'],
               };
               try {
                 final response = await http.post(
@@ -1676,11 +1710,16 @@ class _StokBarangPageState extends State<StokBarangPage> {
                       "action": isEdit ? "edit_stok" : "tambah_stok_manual",
                       "index": isEdit ? widget.stok.indexOf(itemEdit) : null,
                       "nama_barang": namaController.text,
+                      "Nama Barang": namaController.text,
                       "kategori": selectedKategori,
+                      "Kategori": selectedKategori,
                       "jenis_barang": selectedJenis,
                       "jumlah": jumlahController.text,
+                      "Jumlah": jumlahController.text,
                       "satuan": satuanController.text,
+                      "Satuan": satuanController.text,
                       "keterangan": ketController.text,
+                      "Keterangan": ketController.text,
                     };
                     Navigator.pop(dialogContext);
                     try {
@@ -1799,6 +1838,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                 "action": "hapus_paket",
                 "index": index,
                 "nama": item['nama'],
+                "Nama": item['nama'],
               };
               try {
                 final response = await http.post(
@@ -1896,7 +1936,9 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                       "action": isEdit ? "edit_paket" : "tambah_paket",
                       "index": indexEdit,
                       "nama": namaController.text,
+                      "Nama": namaController.text,
                       "harga": hargaController.text,
+                      "Harga": hargaController.text,
                     };
 
                     Navigator.pop(dialogContext);
