@@ -12,13 +12,13 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// Definisi Warna Kustom (Menggantikan emerald & rose)
+// Definisi Warna Kustom (Menggantikan Colors.emerald & Colors.rose)
 const Color colorEmerald = Color(0xFF10B981);
 const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Daftar Paket Global awal
+// Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
 List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
