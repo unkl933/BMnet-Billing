@@ -12,8 +12,14 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
-var daftarPaketGlobal = >[
+// Definisi Warna Kustom (Menggantikan emerald & rose)
+const Color colorEmerald = Color(0xFF10B981);
+const Color colorEmeraldAccent = Color(0xFF34D399);
+const Color colorRose = Color(0xFFF43F5E);
+const Color colorRoseAccent = Color(0xFFFB7185);
+
+// Daftar Paket Global awal
+List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
@@ -44,7 +50,7 @@ class BMNetworkApp extends StatelessWidget {
           surfaceContainerHigh: Color(0xFF334155), // Slate 700
           error: Color(0xFFEF4444), // Red 500
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -111,8 +117,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             stokData = decoded['stok'] ?? [];
 
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              daftarPaketGlobal = (decoded['paket'] as List).map>((item) {
-                return {
+              daftarPaketGlobal = (decoded['paket'] as List).map((item) {
+                return <String, String>{
                   'nama': item['nama']?.toString() ?? '',
                   'harga': item['harga']?.toString() ?? '',
                 };
@@ -423,13 +429,13 @@ class BillingHomePage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isLunas ? Colors.emerald.withOpacity(0.2) : Colors.rose.withOpacity(0.2),
+                      color: isLunas ? colorEmerald.withOpacity(0.2) : colorRose.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isLunas ? Colors.emerald : Colors.rose),
+                      border: Border.all(color: isLunas ? colorEmerald : colorRose),
                     ),
                     child: Text(
                       item['status'] ?? 'Belum Lunas',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: isLunas ? Colors.emeraldAccent : Colors.roseAccent, fontSize: 12),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: isLunas ? colorEmeraldAccent : colorRoseAccent, fontSize: 12),
                     ),
                   )
                 ],
@@ -449,7 +455,7 @@ class BillingHomePage extends StatelessWidget {
           ),
           if (!isLunas)
             ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.emerald, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(backgroundColor: colorEmerald, foregroundColor: Colors.black),
               onPressed: () {
                 Navigator.pop(context);
                 _showBayarDialog(context, item);
@@ -563,7 +569,7 @@ class BillingHomePage extends StatelessWidget {
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.emerald, foregroundColor: Colors.black),
+                  style: ElevatedButton.styleFrom(backgroundColor: colorEmerald, foregroundColor: Colors.black),
                   onPressed: () async {
                     Navigator.pop(context);
                     final payload = {
@@ -635,12 +641,12 @@ class BillingHomePage extends StatelessWidget {
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: isLunas ? Colors.emerald.withOpacity(0.15) : Colors.rose.withOpacity(0.15),
+                                  color: isLunas ? colorEmerald.withOpacity(0.15) : colorRose.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
                                   isLunas ? Icons.check_circle_outline : Icons.pending_actions_outlined,
-                                  color: isLunas ? Colors.emeraldAccent : Colors.roseAccent,
+                                  color: isLunas ? colorEmeraldAccent : colorRoseAccent,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -672,12 +678,12 @@ class BillingHomePage extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: isLunas ? Colors.emerald.withOpacity(0.2) : Colors.rose.withOpacity(0.2),
+                                            color: isLunas ? colorEmerald.withOpacity(0.2) : colorRose.withOpacity(0.2),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
                                             isLunas ? 'LUNAS' : '${item['jumlah_bulan_tunggakan'] ?? '1'} Bln Tunggakan',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isLunas ? Colors.emeraldAccent : Colors.roseAccent),
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isLunas ? colorEmeraldAccent : colorRoseAccent),
                                           ),
                                         ),
                                       ],
@@ -1103,7 +1109,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
             children: [
               Text('Kategori : ${item['kategori'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
               const SizedBox(height: 5),
-              Text('Nominal  : Rp ${item['nominal'] ?? '0'}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+              Text('Nominal  : Rp ${item['nominal'] ?? '0'}', style: const TextStyle(color: colorRoseAccent, fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
               Text('Tanggal  : ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFFCBD5E1))),
               if (item['jumlah_stok'] != null && item['jumlah_stok'].toString().isNotEmpty) ...[
@@ -1115,7 +1121,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
         ),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
+            style: TextButton.styleFrom(foregroundColor: colorRoseAccent),
             onPressed: () {
               Navigator.pop(dialogContext);
               _confirmHapusPengeluaran(item);
@@ -1151,7 +1157,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: colorRose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
               final payload = {
@@ -1353,12 +1359,12 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                         onTap: () => _showPengeluaranDetailDialog(item),
                         leading: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.rose.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.arrow_downward_rounded, color: Colors.roseAccent),
+                          decoration: BoxDecoration(color: colorRose.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.arrow_downward_rounded, color: colorRoseAccent),
                         ),
                         title: Text(item['keterangan']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                         subtitle: Text('${item['kategori'] ?? '-'} • ${item['tanggal'] ?? '-'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.roseAccent, fontSize: 14)),
+                        trailing: Text('Rp ${item['nominal'] ?? '0'}', style: const TextStyle(fontWeight: FontWeight.bold, color: colorRoseAccent, fontSize: 14)),
                       ),
                     );
                   },
@@ -1411,7 +1417,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
         ),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
+            style: TextButton.styleFrom(foregroundColor: colorRoseAccent),
             onPressed: () {
               Navigator.pop(dialogContext);
               _confirmHapusStok(item);
@@ -1447,7 +1453,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: colorRose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
               final payload = {
@@ -1646,7 +1652,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.rose, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: colorRose, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
               setState(() {
@@ -1706,7 +1712,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
               actions: [
                 if (isEdit)
                   TextButton.icon(
-                    style: TextButton.styleFrom(foregroundColor: Colors.roseAccent),
+                    style: TextButton.styleFrom(foregroundColor: colorRoseAccent),
                     onPressed: isSaving ? null : () {
                       Navigator.pop(dialogContext);
                       _confirmHapusPaket(indexEdit!, itemEdit);
@@ -2113,27 +2119,27 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                   label: Text('Cetak Laporan $selectedPeriode (PDF)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 16),
-                _buildStatCard('Pemasukan Lunas', 'Rp $totalPemasukanLunas', Colors.emeraldAccent, Icons.trending_up_rounded),
+                _buildStatCard('Pemasukan Lunas', 'Rp $totalPemasukanLunas', colorEmeraldAccent, Icons.trending_up_rounded),
                 const SizedBox(height: 10),
                 _buildStatCard('Total Piutang / Tunggakan', 'Rp $totalTunggakanPelanggan', Colors.amberAccent, Icons.pending_actions_rounded),
                 const SizedBox(height: 10),
-                _buildStatCard('Total Pengeluaran', 'Rp $totalPengeluaran', Colors.roseAccent, Icons.trending_down_rounded),
+                _buildStatCard('Total Pengeluaran', 'Rp $totalPengeluaran', colorRoseAccent, Icons.trending_down_rounded),
                 const SizedBox(height: 16),
                 Card(
                   color: const Color(0xFF0F172A),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: labaBersih >= 0 ? const Color(0xFF06B6D4) : Colors.rose, width: 1.5),
+                    side: BorderSide(color: labaBersih >= 0 ? const Color(0xFF06B6D4) : colorRose, width: 1.5),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        Text('LABA / RUGI BERSIH', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8), letterSpacing: 1)),
+                        const Text('LABA / RUGI BERSIH', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1)),
                         const SizedBox(height: 6),
                         Text(
                           'Rp $labaBersih',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? const Color(0xFF06B6D4) : Colors.roseAccent),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: labaBersih >= 0 ? const Color(0xFF06B6D4) : colorRoseAccent),
                         ),
                       ],
                     ),
