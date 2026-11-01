@@ -12,13 +12,13 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// Definisi Warna Kustom (Menggantikan Colors.emerald & Colors.rose)
+// Definisi Warna Kustom
 const Color colorEmerald = Color(0xFF10B981);
 const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
+// Baris 22: Deklarasi tipe List yang sudah diperbaiki
 List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -42,13 +42,13 @@ class BMNetworkApp extends StatelessWidget {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF06B6D4), // Cyan 500
-          secondary: Color(0xFF3B82F6), // Blue 500
-          surface: Color(0xFF1E293B), // Slate 800
-          surfaceContainerHigh: Color(0xFF334155), // Slate 700
-          error: Color(0xFFEF4444), // Red 500
+          primary: Color(0xFF06B6D4),
+          secondary: Color(0xFF3B82F6),
+          surface: Color(0xFF1E293B),
+          surfaceContainerHigh: Color(0xFF334155),
+          error: Color(0xFFEF4444),
         ),
         cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
