@@ -117,7 +117,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             stokData = decoded['stok'] ?? [];
 
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              var listPaketBaru = >[];
+              var listPaketBaru = [];
               for (var item in (decoded['paket'] as List)) {
                 listPaketBaru.add({
                   'nama': item['nama']?.toString() ?? '',
@@ -1219,7 +1219,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
@@ -1228,7 +1228,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                     ),
                     const SizedBox(height: 10),
                     if (isBelanjaAset) ...[
-                      DropdownButtonFormField<String>(
+                      DropdownButtonFormField(
                         dropdownColor: const Color(0xFF1E293B),
                         decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
                         value: selectedJenisAset,
@@ -1511,7 +1511,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       value: selectedKategori,
@@ -1519,7 +1519,7 @@ class _StokBarangPageState extends State<StokBarangPage> {
                       onChanged: (val) => setDialogState(() => selectedKategori = val.toString()),
                     ),
                     const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField(
                       dropdownColor: const Color(0xFF1E293B),
                       decoration: const InputDecoration(labelText: 'Jenis Barang Aset'),
                       value: selectedJenis,
@@ -1856,7 +1856,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     int totalPotensiTunggakan = 0;
     int totalPengeluaran = 0;
 
-    var rekapKategoriPengeluaran = <String, int>{};
+    var rekapKategoriPengeluaran = {};
     var rincianPemasukanLunas = [];
     var rincianPenguranganMaterial = [];
 
@@ -2034,7 +2034,7 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
                 ),
                 ...rekapKategoriPengeluaran.entries.map((e) => pw.TableRow(
                   children: [
-                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(e.key, style: const pw.TextStyle(fontSize: 7))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(e.key.toString(), style: const pw.TextStyle(fontSize: 7))),
                     pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Rp ${e.value}', style: const pw.TextStyle(fontSize: 7), textAlign: pw.TextAlign.right)),
                   ],
                 )),
