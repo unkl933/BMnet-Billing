@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
 // Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
-var daftarPaketGlobal = [
+var daftarPaketGlobal = >[
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
@@ -62,7 +62,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
             // Sinkronkan daftar paket dari Google Sheets jika tersedia
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              daftarPaketGlobal = (decoded['paket'] as List).map((item) {
+              daftarPaketGlobal = (decoded['paket'] as List).map>((item) {
                 return {
                   'nama': item['nama']?.toString() ?? '',
                   'harga': item['harga']?.toString() ?? '',
@@ -679,6 +679,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   String materialStr = "ONT: ${selectedOnt ?? '-'}, Dropcore: ${_dropcoreController.text}m, Patchcore: ${_patchcoreController.text}pcs";
 
                   final payload = {
+                    "action": "tambah_pelanggan",
                     "idpel": _idpelController.text,
                     "nama": _namaController.text,
                     "alamat": _alamatController.text,
@@ -1520,7 +1521,7 @@ class PaketInternetPage extends StatefulWidget {
 }
 
 class _PaketInternetPageState extends State<PaketInternetPage> {
-  void _confirmHapusPaket(int index, Map item) {
+  void _confirmHapusPaket(int index, Map<String, String> item) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1532,20 +1533,24 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(dialogContext);
+              
+              // Hapus secara lokal
+              setState(() {
+                daftarPaketGlobal.removeAt(index);
+              });
+
               final payload = {
                 "action": "hapus_paket",
                 "index": index,
                 "nama": item['nama'],
               };
               try {
-                final response = await http.post(
+                await http.post(
                   Uri.parse(scriptUrl),
                   headers: {"Content-Type": "application/json"},
                   body: json.encode(payload),
                 );
-                if (response.statusCode == 200 || response.statusCode == 302) {
-                  widget.onRefresh();
-                }
+                widget.onRefresh();
               } catch (e) {
                 // ignore
               }
@@ -1557,7 +1562,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
     );
   }
 
-  void _showFormPaketDialog({Map? itemEdit, int? indexEdit}) {
+  void _showFormPaketDialog({Map<String, String>? itemEdit, int? indexEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama'] : '');
     final TextEditingController hargaController = TextEditingController(text: isEdit ? itemEdit['harga'] : '');
@@ -1608,6 +1613,20 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                           if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
                           setDialogState(() => isSaving = true);
 
+                          final newPaket = {
+                            "nama": namaController.text,
+                            "harga": hargaController.text,
+                          };
+
+                          // Perbarui memori lokal secara langsung
+                          this.setState(() {
+                            if (isEdit && indexEdit != null) {
+                              daftarPaketGlobal[indexEdit] = newPaket;
+                            } else {
+                              daftarPaketGlobal.add(newPaket);
+                            }
+                          });
+
                           final payload = {
                             "action": isEdit ? "edit_paket" : "tambah_paket",
                             "index": indexEdit,
@@ -1615,20 +1634,17 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                             "harga": hargaController.text,
                           };
 
+                          Navigator.pop(dialogContext);
+
                           try {
-                            final response = await http.post(
+                            await http.post(
                               Uri.parse(scriptUrl),
                               headers: {"Content-Type": "application/json"},
                               body: json.encode(payload),
                             );
-                            if (response.statusCode == 200 || response.statusCode == 302) {
-                              Navigator.pop(dialogContext);
-                              widget.onRefresh();
-                            } else {
-                              setDialogState(() => isSaving = false);
-                            }
+                            widget.onRefresh();
                           } catch (e) {
-                            setDialogState(() => isSaving = false);
+                            // ignore
                           }
                         },
                   child: isSaving
