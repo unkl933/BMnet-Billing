@@ -12,8 +12,8 @@ import 'package:path_provider/path_provider.dart';
 
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
-// Daftar Paket Global agar bisa diedit dan ditambah di seluruh halaman
-var daftarPaketGlobal = [
+// Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
+List> daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
@@ -59,6 +59,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             pelangganData = decoded['pelanggan'] ?? [];
             pengeluaranData = decoded['pengeluaran'] ?? [];
             stokData = decoded['stok'] ?? [];
+
+            // Sinkronkan daftar paket dari Google Sheets jika tersedia
+            if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
+              daftarPaketGlobal = (decoded['paket'] as List).map>((item) {
+                return {
+                  'nama': item['nama']?.toString() ?? '',
+                  'harga': item['harga']?.toString() ?? '',
+                };
+              }).toList();
+            }
           }
           isLoading = false;
         });
@@ -74,7 +84,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       BillingHomePage(pelanggan: pelangganData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       PengeluaranPage(pengeluaran: pengeluaranData, stok: stokData, isLoading: isLoading, onRefresh: fetchData),
       StokBarangPage(stok: stokData, isLoading: isLoading, onRefresh: fetchData),
-      PaketInternetPage(onUpdate: () => setState(() {})),
+      PaketInternetPage(isLoading: isLoading, onRefresh: fetchData),
       DashboardKeuanganPage(pelanggan: pelangganData, pengeluaran: pengeluaranData, isLoading: isLoading, onRefresh: fetchData),
     ];
 
@@ -1500,54 +1510,134 @@ class _StokBarangPageState extends State<StokBarangPage> {
 
 // ================= TAB 4: HALAMAN MANAJEMEN PAKET INTERNET =================
 class PaketInternetPage extends StatefulWidget {
-  final VoidCallback onUpdate;
-  const PaketInternetPage({super.key, required this.onUpdate});
+  final bool isLoading;
+  final Future<void> Function() onRefresh;
+
+  const PaketInternetPage({super.key, required this.isLoading, required this.onRefresh});
 
   @override
   State<PaketInternetPage> createState() => _PaketInternetPageState();
 }
 
 class _PaketInternetPageState extends State<PaketInternetPage> {
-  void _showFormPaketDialog({Map<String, dynamic>? itemEdit}) {
+  void _confirmHapusPaket(int index, Map<String, String> item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Konfirmasi Hapus'),
+        content: Text('Yakin ingin menghapus paket "${item['nama']}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final payload = {
+                "action": "hapus_paket",
+                "index": index,
+                "nama": item['nama'],
+              };
+              try {
+                final response = await http.post(
+                  Uri.parse(scriptUrl),
+                  headers: {"Content-Type": "application/json"},
+                  body: json.encode(payload),
+                );
+                if (response.statusCode == 200 || response.statusCode == 302) {
+                  widget.onRefresh();
+                }
+              } catch (e) {
+                // ignore
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFormPaketDialog({Map<String, String>? itemEdit, int? indexEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama'] : '');
     final TextEditingController hargaController = TextEditingController(text: isEdit ? itemEdit['harga'] : '');
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(isEdit ? 'Edit Paket Internet' : 'Tambah Paket Internet Baru'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama Paket (Cth: 30 Mbps)')),
-              const SizedBox(height: 10),
-              TextField(controller: hargaController, decoration: const InputDecoration(labelText: 'Harga (Cth: Rp 150.000)')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () {
-                if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
-                setState(() {
-                  if (isEdit) {
-                    itemEdit['nama'] = namaController.text;
-                    itemEdit['harga'] = hargaController.text;
-                  } else {
-                    daftarPaketGlobal.add({
-                      'nama': namaController.text,
-                      'harga': hargaController.text,
-                    });
-                  }
-                });
-                widget.onUpdate();
-                Navigator.pop(context);
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text(isEdit ? 'Edit Paket Internet' : 'Tambah Paket Internet Baru'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: namaController,
+                    decoration: const InputDecoration(labelText: 'Nama Paket (Cth: 30 Mbps)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: hargaController,
+                    decoration: const InputDecoration(labelText: 'Harga (Cth: Rp 150.000)'),
+                  ),
+                ],
+              ),
+              actions: [
+                if (isEdit)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    onPressed: isSaving
+                        ? null
+                        : () {
+                            Navigator.pop(dialogContext);
+                            _confirmHapusPaket(indexEdit!, itemEdit);
+                          },
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: const Text('Hapus'),
+                  ),
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (namaController.text.isEmpty || hargaController.text.isEmpty) return;
+                          setDialogState(() => isSaving = true);
+
+                          final payload = {
+                            "action": isEdit ? "edit_paket" : "tambah_paket",
+                            "index": indexEdit,
+                            "nama": namaController.text,
+                            "harga": hargaController.text,
+                          };
+
+                          try {
+                            final response = await http.post(
+                              Uri.parse(scriptUrl),
+                              headers: {"Content-Type": "application/json"},
+                              body: json.encode(payload),
+                            );
+                            if (response.statusCode == 200 || response.statusCode == 302) {
+                              Navigator.pop(dialogContext);
+                              widget.onRefresh();
+                            } else {
+                              setDialogState(() => isSaving = false);
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Simpan'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1556,25 +1646,34 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Daftar Paket Internet (${daftarPaketGlobal.length})')),
-      body: ListView.builder(
-        itemCount: daftarPaketGlobal.length,
-        itemBuilder: (context, index) {
-          final paket = daftarPaketGlobal[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: ListTile(
-              leading: const Icon(Icons.wifi, color: Colors.blueAccent),
-              title: Text(paket['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Tarif: ${paket['harga']} (+ PPN 11%)'),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blue),
-                onPressed: () => _showFormPaketDialog(itemEdit: paket),
-              ),
-            ),
-          );
-        },
+      appBar: AppBar(
+        title: Text('Daftar Paket Internet (${daftarPaketGlobal.length})'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: widget.onRefresh),
+        ],
       ),
+      body: widget.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : daftarPaketGlobal.isEmpty
+              ? const Center(child: Text('Belum ada paket internet tersimpan.'))
+              : ListView.builder(
+                  itemCount: daftarPaketGlobal.length,
+                  itemBuilder: (context, index) {
+                    final paket = daftarPaketGlobal[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: ListTile(
+                        leading: const Icon(Icons.wifi, color: Colors.blueAccent),
+                        title: Text(paket['nama'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Tarif: ${paket['harga']} (+ PPN 11%)'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () => _showFormPaketDialog(itemEdit: paket, indexEdit: index),
+                        ),
+                      ),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showFormPaketDialog(),
         child: const Icon(Icons.add),
