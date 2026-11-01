@@ -18,7 +18,7 @@ const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Baris 22: Deklarasi tipe List yang sudah diperbaiki
+// Deklarasi aman menggunakan var (Bebas error sintaks <>)
 var daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -117,12 +117,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             stokData = decoded['stok'] ?? [];
 
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              daftarPaketGlobal = (decoded['paket'] as List).map((item) {
-                return <String, String>{
+              var listPaketBaru = >[];
+              for (var item in (decoded['paket'] as List)) {
+                listPaketBaru.add({
                   'nama': item['nama']?.toString() ?? '',
                   'harga': item['harga']?.toString() ?? '',
-                };
-              }).toList();
+                });
+              }
+              daftarPaketGlobal = listPaketBaru;
             }
           }
           isLoading = false;
@@ -501,7 +503,7 @@ class BillingHomePage extends StatelessWidget {
   void _showBayarDialog(BuildContext context, Map item) {
     String selectedMetode = 'Tunai';
     final TextEditingController petugasController = TextEditingController(text: 'Admin BM Network');
-    final List<String> metodeList = ['Tunai', 'Transfer Bank', 'QRIS', 'DANA', 'GoPay', 'ShopeePay', 'OVO'];
+    var metodeList = ['Tunai', 'Transfer Bank', 'QRIS', 'DANA', 'GoPay', 'ShopeePay', 'OVO'];
 
     showDialog(
       context: context,
@@ -773,7 +775,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    List ontList = widget.stokList.where((s) {
+    var ontList = widget.stokList.where((s) {
       final kat = (s['kategori'] ?? '').toString().toLowerCase();
       final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
       return kat.contains('ont') || nama.contains('ont');
@@ -849,7 +851,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   int jmlBulan = int.tryParse(_bulanTunggakanController.text) ?? 1;
                   int totalTunggakan = (hargaInt * jmlBulan * 1.11).round();
 
-                  List materialPakai = [];
+                  var materialPakai = [];
                   if (selectedOnt != null) materialPakai.add({"nama": selectedOnt, "qty": 1});
                   double dropcoreVal = double.tryParse(_dropcoreController.text) ?? 0;
                   if (dropcoreVal > 0) materialPakai.add({"nama": "Dropcore 1 Roll", "qty": dropcoreVal});
@@ -951,7 +953,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    List ontList = widget.stokList.where((s) {
+    var ontList = widget.stokList.where((s) {
       final kat = (s['kategori'] ?? '').toString().toLowerCase();
       final nama = (s['nama_barang'] ?? '').toString().toLowerCase();
       return kat.contains('ont') || nama.contains('ont');
@@ -1030,7 +1032,7 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                   int jmlBulan = int.tryParse(_bulanController.text) ?? 1;
                   int totalTagihanBaru = (hargaInt * jmlBulan * 1.11).round();
 
-                  List materialPakai = [];
+                  var materialPakai = [];
                   if (selectedOntBaru != null) materialPakai.add({"nama": selectedOntBaru, "qty": 1});
 
                   final payload = {
@@ -1195,8 +1197,8 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
     final TextEditingController jumlahStokController = TextEditingController(text: isEdit ? (itemEdit['jumlah_stok']?.toString() ?? '1') : '1');
     final TextEditingController satuanStokController = TextEditingController(text: isEdit ? (itemEdit['satuan_stok']?.toString() ?? 'Pcs') : 'Pcs');
 
-    final List<String> kategoriList = ['Belanja Aset', 'Operasional', 'Gaji Karyawan', 'Hutang', 'Donasi Sosial', 'Maintenance / Pemeliharaan', 'Penarikan Jalur FO'];
-    final List<String> jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
+    var kategoriList = ['Belanja Aset', 'Operasional', 'Gaji Karyawan', 'Hutang', 'Donasi Sosial', 'Maintenance / Pemeliharaan', 'Penarikan Jalur FO'];
+    var jenisAsetList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris'];
 
     String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Operasional').trim() : 'Operasional';
     if (!kategoriList.contains(selectedKategori)) selectedKategori = 'Operasional';
@@ -1483,8 +1485,8 @@ class _StokBarangPageState extends State<StokBarangPage> {
 
   void _showFormStokDialog({Map? itemEdit}) {
     bool isEdit = itemEdit != null;
-    final List<String> kategoriList = ['Belanja Aset', 'ONT/Perangkat', 'Kabel FO', 'Aksesoris Jaringan', 'Tools & Peralatan', 'Operasional', 'Lainnya'];
-    final List<String> jenisBarangList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris', 'Umum'];
+    var kategoriList = ['Belanja Aset', 'ONT/Perangkat', 'Kabel FO', 'Aksesoris Jaringan', 'Tools & Peralatan', 'Operasional', 'Lainnya'];
+    var jenisBarangList = ['ONT', 'OLT', 'FO', 'STB', 'Patchcore', 'Protect', 'Tools', 'Aksesoris', 'Umum'];
 
     String selectedKategori = isEdit ? (itemEdit['kategori']?.toString() ?? 'Belanja Aset').trim() : 'Belanja Aset';
     if (!kategoriList.contains(selectedKategori)) kategoriList.add(selectedKategori);
@@ -1642,7 +1644,7 @@ class PaketInternetPage extends StatefulWidget {
 }
 
 class _PaketInternetPageState extends State<PaketInternetPage> {
-  void _confirmHapusPaket(int index, Map<String, String> item) {
+  void _confirmHapusPaket(int index, Map item) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1681,7 +1683,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
     );
   }
 
-  void _showFormPaketDialog({Map<String, String>? itemEdit, int? indexEdit}) {
+  void _showFormPaketDialog({Map? itemEdit, int? indexEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama'] : '');
     final TextEditingController hargaController = TextEditingController(text: isEdit ? itemEdit['harga'] : '');
@@ -1854,9 +1856,9 @@ class _DashboardKeuanganPageState extends State<DashboardKeuanganPage> {
     int totalPotensiTunggakan = 0;
     int totalPengeluaran = 0;
 
-    Map<String, int> rekapKategoriPengeluaran = {};
-    List rincianPemasukanLunas = [];
-    List rincianPenguranganMaterial = [];
+    var rekapKategoriPengeluaran = <String, int>{};
+    var rincianPemasukanLunas = [];
+    var rincianPenguranganMaterial = [];
 
     for (var item in widget.pelanggan) {
       final status = (item['status'] ?? 'Belum Lunas').toString().toLowerCase();
