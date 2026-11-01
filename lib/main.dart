@@ -177,10 +177,14 @@ class Store extends ChangeNotifier {
   String? error;
 
   List<Rec> _l(Map d, String k) {
-    final v = d[k] ?? d[k.toLowerCase()];
+    final key = d.keys.firstWhere(
+      (element) => element.toString().toLowerCase() == k.toLowerCase(),
+      orElse: () => null,
+   );
+    final v = key != null ? d[key] : null;
     return v is List ? v.map((e) => Rec(e as Map)).toList() : <Rec>[];
-  }
-
+   }
+  
   Future<void> refresh() async {
     loading = true;
     error = null;
