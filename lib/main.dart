@@ -130,7 +130,7 @@ Map<String, dynamic> op(String sheet, String o, Map<String, dynamic> d) =>
 Map<String, dynamic> adj(String id, num delta) => op('Stok', 'adjust', {'id': id, 'delta': delta});
 
 class Api {
-    static Future> get() async {
+    static Future<Map<String, dynamic>> get() async {
     if (Cfg.scriptUrl.startsWith('PASTE')) throw 'Isi Cfg.scriptUrl dengan URL Web App Apps Script';
     
     final client = http.Client();
