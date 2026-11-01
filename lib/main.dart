@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 const String scriptUrl = 'https://script.google.com/macros/s/AKfycbzZdliydavTiyFWecz1OvPjGMh6vGd3-5zPbxoHRV95EBz5k9-rrNTvQ5k5MBm_9FmDhQ/exec';
 
 // Daftar Paket Global awal (fallback jika belum ada data di Google Sheet)
-List> daftarPaketGlobal = [
+var daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
@@ -62,7 +62,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
             // Sinkronkan daftar paket dari Google Sheets jika tersedia
             if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              daftarPaketGlobal = (decoded['paket'] as List).map>((item) {
+              daftarPaketGlobal = (decoded['paket'] as List).map((item) {
                 return {
                   'nama': item['nama']?.toString() ?? '',
                   'harga': item['harga']?.toString() ?? '',
@@ -1520,7 +1520,7 @@ class PaketInternetPage extends StatefulWidget {
 }
 
 class _PaketInternetPageState extends State<PaketInternetPage> {
-  void _confirmHapusPaket(int index, Map<String, String> item) {
+  void _confirmHapusPaket(int index, Map item) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1557,7 +1557,7 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
     );
   }
 
-  void _showFormPaketDialog({Map<String, String>? itemEdit, int? indexEdit}) {
+  void _showFormPaketDialog({Map? itemEdit, int? indexEdit}) {
     bool isEdit = itemEdit != null;
     final TextEditingController namaController = TextEditingController(text: isEdit ? itemEdit['nama'] : '');
     final TextEditingController hargaController = TextEditingController(text: isEdit ? itemEdit['harga'] : '');
