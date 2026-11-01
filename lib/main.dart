@@ -18,7 +18,7 @@ const Color colorEmeraldAccent = Color(0xFF34D399);
 const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
-// Deklarasi aman dengan List polos (Tipe inferred sebagai List<dynamic>)
+// Deklarasi aman dengan List polos (Bebas dari bentrokan tipe data)
 List daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
@@ -104,34 +104,99 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     fetchData();
   }
 
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
   Future<void> fetchData() async {
     setState(() => isLoading = true);
     try {
       final response = await http.get(Uri.parse(scriptUrl));
       if (response.statusCode == 200 || response.statusCode == 302) {
         final decoded = json.decode(response.body);
-        setState(() {
-          if (decoded is Map) {
-            pelangganData = decoded['pelanggan'] ?? [];
-            pengeluaranData = decoded['pengeluaran'] ?? [];
-            stokData = decoded['stok'] ?? [];
+        if (decoded is Map) {
+          // 1. Normalisasi Key Data Pelanggan
+          List rawPelanggan = decoded['pelanggan'] ?? [];
+          List listPelanggan = rawPelanggan.map((item) {
+            return {
+              'idpel': (item['idpel'] ?? item['IDPel'] ?? item['ID Pelanggan'] ?? '').toString(),
+              'nama': (item['nama'] ?? item['Nama'] ?? '').toString(),
+              'alamat': (item['alamat'] ?? item['Alamat'] ?? '').toString(),
+              'paket': (item['paket'] ?? item['Paket'] ?? '').toString(),
+              'harga': (item['harga'] ?? item['Harga'] ?? '').toString(),
+              'no_hp': (item['no_hp'] ?? item['No HP'] ?? item['No_HP'] ?? '').toString(),
+              'teknisi': (item['teknisi'] ?? item['Teknisi'] ?? '').toString(),
+              'jumlah_bulan_tunggakan': (item['jumlah_bulan_tunggakan'] ?? item['Jumlah Bulan'] ?? '1').toString(),
+              'petugas_penerima': (item['petugas_penerima'] ?? item['Petugas'] ?? '').toString(),
+              'status': (item['status'] ?? item['Status'] ?? 'Belum Lunas').toString(),
+              'total_tunggakan': (item['total_tunggakan'] ?? item['Total Tunggakan'] ?? '0').toString(),
+              'metode_pembayaran': (item['metode_pembayaran'] ?? item['Metode'] ?? '').toString(),
+              'material_terpakai': (item['material_terpakai'] ?? item['Material Terpakai'] ?? '').toString(),
+            };
+          }).toList();
 
-            if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
-              List listPaketBaru = [];
-              for (var item in (decoded['paket'] as List)) {
-                listPaketBaru.add({
-                  'nama': item['nama']?.toString() ?? '',
-                  'harga': item['harga']?.toString() ?? '',
-                });
-              }
-              daftarPaketGlobal = listPaketBaru;
+          // 2. Normalisasi Key Data Pengeluaran
+          List rawPengeluaran = decoded['pengeluaran'] ?? [];
+          List listPengeluaran = rawPengeluaran.map((item) {
+            return {
+              'tanggal': (item['tanggal'] ?? item['Tanggal'] ?? '').toString(),
+              'kategori': (item['kategori'] ?? item['Kategori'] ?? '-').toString(),
+              'keterangan': (item['keterangan'] ?? item['Keterangan'] ?? '-').toString(),
+              'nominal': (item['nominal'] ?? item['Nominal'] ?? '0').toString(),
+              'jumlah_stok': (item['jumlah_stok'] ?? item['Jumlah Stok'] ?? item['Jumlah_Stok'] ?? '').toString(),
+              'satuan_stok': (item['satuan_stok'] ?? item['Satuan Stok'] ?? item['Satuan_Stok'] ?? '').toString(),
+            };
+          }).toList();
+
+          // 3. Normalisasi Key Data Stok
+          List rawStok = decoded['stok'] ?? [];
+          List listStok = rawStok.map((item) {
+            return {
+              'nama_barang': (item['nama_barang'] ?? item['Nama Barang'] ?? item['Nama_Barang'] ?? item['Nama'] ?? '-').toString(),
+              'kategori': (item['kategori'] ?? item['Kategori'] ?? '-').toString(),
+              'jumlah': (item['jumlah'] ?? item['Jumlah'] ?? '0').toString(),
+              'satuan': (item['satuan'] ?? item['Satuan'] ?? 'Pcs').toString(),
+              'keterangan': (item['keterangan'] ?? item['Keterangan'] ?? '-').toString(),
+            };
+          }).toList();
+
+          // 4. Normalisasi Key Data Paket
+          if (decoded['paket'] != null && (decoded['paket'] as List).isNotEmpty) {
+            List listPaketBaru = [];
+            for (var item in (decoded['paket'] as List)) {
+              listPaketBaru.add({
+                'nama': (item['nama'] ?? item['Nama'] ?? '').toString(),
+                'harga': (item['harga'] ?? item['Harga'] ?? '').toString(),
+              });
             }
+            daftarPaketGlobal = listPaketBaru;
           }
-          isLoading = false;
-        });
+
+          setState(() {
+            pelangganData = listPelanggan;
+            pengeluaranData = listPengeluaran;
+            stokData = listStok;
+            isLoading = false;
+          });
+        } else {
+          setState(() => isLoading = false);
+          _showErrorSnackBar('Format data dari Apps Script tidak sesuai (Bukan JSON Object)');
+        }
+      } else {
+        setState(() => isLoading = false);
+        _showErrorSnackBar('Gagal terhubung ke Apps Script (Status HTTP: ${response.statusCode})');
       }
     } catch (e) {
       setState(() => isLoading = false);
+      _showErrorSnackBar('Gagal memuat data dari Apps Script: $e');
     }
   }
 
@@ -507,9 +572,9 @@ class BillingHomePage extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogContext, setDialogState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1E293B),
               title: Text('Pelunasan: ${item['nama']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -569,11 +634,11 @@ class BillingHomePage extends StatelessWidget {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal', style: TextStyle(color: Color(0xFF94A3B8)))),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: colorEmerald, foregroundColor: Colors.black),
                   onPressed: () async {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     final payload = {
                       "action": "bayar_pelanggan",
                       "idpel": item['idpel'],
@@ -590,9 +655,15 @@ class BillingHomePage extends StatelessWidget {
                       );
                       if (response.statusCode == 200 || response.statusCode == 302) {
                         onRefresh();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Gagal simpan pembayaran: Status HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                        );
                       }
                     } catch (e) {
-                      // ignore
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error pembayaran Apps Script: $e'), backgroundColor: Colors.red),
+                      );
                     }
                   },
                   child: const Text('Konfirmasi Lunas', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -887,10 +958,22 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                       body: json.encode(payload),
                     );
                     if (response.statusCode == 200 || response.statusCode == 302) {
-                      Navigator.pop(context, true);
+                      if (mounted) Navigator.pop(context, true);
+                    } else {
+                      setState(() => isSaving = false);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Gagal tambah pelanggan: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   } catch (e) {
                     setState(() => isSaving = false);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal koneksi Apps Script: $e'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Icons.save_rounded),
@@ -1059,10 +1142,22 @@ class _UpgradePelangganPageState extends State<UpgradePelangganPage> {
                       body: json.encode(payload),
                     );
                     if (response.statusCode == 200 || response.statusCode == 302) {
-                      Navigator.pop(context, true);
+                      if (mounted) Navigator.pop(context, true);
+                    } else {
+                      setState(() => isSaving = false);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Gagal simpan upgrade: Status HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   } catch (e) {
                     setState(() => isSaving = false);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error upgrade Apps Script: $e'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Icons.save_rounded),
@@ -1175,9 +1270,19 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 );
                 if (response.statusCode == 200 || response.statusCode == 302) {
                   widget.onRefresh();
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Gagal hapus pengeluaran: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                    );
+                  }
                 }
               } catch (e) {
-                // ignore
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error hapus pengeluaran: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text('Hapus'),
@@ -1318,9 +1423,19 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       );
                       if (response.statusCode == 200 || response.statusCode == 302) {
                         widget.onRefresh();
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal simpan pengeluaran: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                          );
+                        }
                       }
                     } catch (e) {
-                      // ignore
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error simpan pengeluaran: $e'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   },
                   child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1471,9 +1586,19 @@ class _StokBarangPageState extends State<StokBarangPage> {
                 );
                 if (response.statusCode == 200 || response.statusCode == 302) {
                   widget.onRefresh();
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Gagal hapus stok: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                    );
+                  }
                 }
               } catch (e) {
-                // ignore
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error hapus stok: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text('Hapus'),
@@ -1566,9 +1691,19 @@ class _StokBarangPageState extends State<StokBarangPage> {
                       );
                       if (response.statusCode == 200 || response.statusCode == 302) {
                         widget.onRefresh();
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal simpan stok: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                          );
+                        }
                       }
                     } catch (e) {
-                      // ignore
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error simpan stok: $e'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   },
                   child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1666,14 +1801,26 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                 "nama": item['nama'],
               };
               try {
-                await http.post(
+                final response = await http.post(
                   Uri.parse(scriptUrl),
                   headers: {"Content-Type": "application/json"},
                   body: json.encode(payload),
                 );
-                widget.onRefresh();
+                if (response.statusCode == 200 || response.statusCode == 302) {
+                  widget.onRefresh();
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Gagal hapus paket: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               } catch (e) {
-                // ignore
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error hapus paket: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text('Hapus'),
@@ -1755,14 +1902,26 @@ class _PaketInternetPageState extends State<PaketInternetPage> {
                     Navigator.pop(dialogContext);
 
                     try {
-                      await http.post(
+                      final response = await http.post(
                         Uri.parse(scriptUrl),
                         headers: {"Content-Type": "application/json"},
                         body: json.encode(payload),
                       );
-                      widget.onRefresh();
+                      if (response.statusCode == 200 || response.statusCode == 302) {
+                        widget.onRefresh();
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal simpan paket: HTTP ${response.statusCode}'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
                     } catch (e) {
-                      // ignore
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error simpan paket: $e'), backgroundColor: Colors.red),
+                        );
+                      }
                     }
                   },
                   child: isSaving
