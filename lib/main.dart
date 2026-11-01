@@ -19,7 +19,7 @@ const Color colorRose = Color(0xFFF43F5E);
 const Color colorRoseAccent = Color(0xFFFB7185);
 
 // Baris 22: Deklarasi tipe List yang sudah diperbaiki
-List> daftarPaketGlobal = [
+var daftarPaketGlobal = [
   {'nama': 'LITE 7 Mbps', 'harga': 'Rp 90.090'},
   {'nama': 'BASIC 10 Mbps', 'harga': 'Rp 108.108'},
   {'nama': 'STANDAR 15 Mbps', 'harga': 'Rp 135.135'},
