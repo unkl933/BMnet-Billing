@@ -15,6 +15,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ------------------------------------------------------------
 //  KONFIGURASI  (ubah sesuai data perusahaan)
@@ -24,7 +25,7 @@ class Cfg {
   static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
-  static const address = 'Jl. Utama Networking No. 88';
+  static const address = 'Jl. Kiarajangkung No. 88';
   static const wa = '0812-3456-7890';
   static const bank = 'BCA 1234567890';
   static const ewallet = '0812-3456-7890 (DANA / OVO / GoPay / ShopeePay)';
@@ -304,6 +305,27 @@ Widget payHint(String m) {
   return const SizedBox.shrink();
 }
 
+/// Buka Google Maps ke titik koordinat pelanggan (atau alamat bila koordinat kosong).
+Future<void> openMaps(BuildContext c, Rec p) async {
+  final raw = p.s('koordinat');
+  final koor = raw.replaceAll(RegExp(r'\s'), '');
+  Uri uri;
+  if (raw.startsWith('http')) {
+    uri = Uri.parse(raw); // link Google Maps yang ditempel langsung
+  } else {
+    final valid = RegExp(r'^-?\d+(\.\d+)?,-?\d+(\.\d+)?$').hasMatch(koor);
+    final q = valid
+        ? koor
+        : Uri.encodeComponent('${p.s('kampung')} ${p.s('kecamatan')} ${p.s('kabupaten')}'.trim());
+    uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$q');
+  }
+  var ok = false;
+  try {
+    ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {}
+  if (!ok && c.mounted) toast(c, 'Tidak bisa membuka Google Maps');
+}
+
 Future<T?> sheet<T>(BuildContext c, Widget w) => showModalBottomSheet<T>(
       context: c,
       isScrollControlled: true,
@@ -407,7 +429,7 @@ class BMApp extends StatelessWidget {
   const BMApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'BM Network Ops',
+        title: 'BM Network',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -484,7 +506,7 @@ class _ShellState extends State<Shell> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Image.asset('assets/images/logo.png', height: 72),
                     const SizedBox(height: 10),
-                    const Text('BM Network Ops', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text('BM Network', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const Text('Internet Solution', style: TextStyle(color: C.slate)),
                   ]),
                 ),
@@ -564,7 +586,7 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(24), children: [
         Center(child: Image.asset('assets/images/logo.png', height: 110)),
         const SizedBox(height: 12),
-        const Center(child: Text('BM Network Ops', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+        const Center(child: Text('BM Network', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
         const Center(child: Text('Versi 1.0.0', style: TextStyle(color: C.slate))),
         const SizedBox(height: 20),
         const Text(
@@ -725,6 +747,27 @@ class _PelState extends State<PelangganTab> {
 
   Future<void> act(String a, Rec c) async {
     switch (a) {
+      case 'detail':
+        {
+          final res = await sheet(context, PelangganDetail(c));
+          if (res is String && mounted) await act(res, c);
+          break;
+        }
+      case 'edit':
+        await sheet(context, EditPelangganForm(c));
+        break;
+      case 'maps':
+        await openMaps(context, c);
+        break;
+      case 'hapus':
+        {
+          final yes = await confirm(context, 'Hapus pelanggan?',
+              '${c.s('nama')} (${c.s('id')}) akan dihapus dari daftar. Stok perangkat TIDAK dikembalikan otomatis. '
+              'Gunakan "Berhenti Berlangganan" bila perangkat akan ditarik. Riwayat transaksi tetap tersimpan.');
+          if (!yes || !mounted) return;
+          await exec(context, [op('Pelanggan', 'delete', {'id': c.s('id')})], ok: 'Pelanggan dihapus');
+          break;
+        }
       case 'bayar':
         final r = await sheet(context, BayarForm(c));
         if (r is Map<String, dynamic> && mounted) {
@@ -769,7 +812,7 @@ class _PelState extends State<PelangganTab> {
     final lunas = bulan == 0;
     final menunggu = c.s('aktif') == 'Menunggu Penarikan';
     return Panel(
-      onTap: () => act('bayar', c),
+      onTap: () => act('detail', c),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         CircleAvatar(
           backgroundColor: (lunas ? C.emerald : C.rose).withValues(alpha: .18),
@@ -780,7 +823,15 @@ class _PelState extends State<PelangganTab> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${c.s('nama')}  (${c.s('id')})', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
-            Text(alamat(c), style: const TextStyle(color: C.slate, fontSize: 12)),
+            GestureDetector(
+              onTap: () => openMaps(context, c),
+              child: Text.rich(TextSpan(children: [
+                const WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(padding: EdgeInsets.only(right: 3), child: Icon(Icons.place, size: 13, color: C.cyan))),
+                TextSpan(text: alamat(c), style: const TextStyle(color: C.slate, fontSize: 12)),
+              ])),
+            ),
             const SizedBox(height: 6),
             Wrap(spacing: 6, runSpacing: 4, children: [
               tag(c.s('paket').isEmpty ? '-' : c.s('paket'), C.cyan),
@@ -793,13 +844,22 @@ class _PelState extends State<PelangganTab> {
         PopupMenuButton<String>(
           onSelected: (a) => act(a, c),
           itemBuilder: (_) => menunggu
-              ? const [PopupMenuItem(value: 'ambil', child: Text('Konfirmasi material diambil'))]
+              ? const [
+                  PopupMenuItem(value: 'ambil', child: Text('Konfirmasi material diambil')),
+                  PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
+                  PopupMenuItem(value: 'edit', child: Text('Edit Data')),
+                  PopupMenuItem(value: 'hapus', child: Text('Hapus Pelanggan')),
+                ]
               : const [
+                  PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
+                  PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
+                  PopupMenuItem(value: 'edit', child: Text('Edit Data')),
                   PopupMenuItem(value: 'bayar', child: Text('Pelunasan / Bayar')),
                   PopupMenuItem(value: 'nota', child: Text('Nota Tagihan Pasang Baru')),
                   PopupMenuItem(value: 'upgrade', child: Text('Ganti Paket / Ubah Tagihan')),
                   PopupMenuItem(value: 'gangguan', child: Text('Gangguan / Perbaikan')),
                   PopupMenuItem(value: 'berhenti', child: Text('Berhenti Berlangganan')),
+                  PopupMenuItem(value: 'hapus', child: Text('Hapus Pelanggan')),
                 ],
         ),
       ]),
@@ -846,6 +906,158 @@ class _PelState extends State<PelangganTab> {
       ),
     ]);
   }
+}
+
+// ---------- Info Pelanggan ----------
+class PelangganDetail extends StatelessWidget {
+  final Rec c;
+  const PelangganDetail(this.c, {super.key});
+
+  Widget row(String k, String v, {VoidCallback? onTap}) {
+    final link = onTap != null && v.isNotEmpty;
+    return InkWell(
+      onTap: link ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 105, child: Text(k, style: const TextStyle(color: C.slate))),
+          Expanded(
+            child: Text(
+              v.isEmpty ? '-' : v,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: link ? C.cyan : null,
+                decoration: link ? TextDecoration.underline : null,
+                decorationColor: C.cyan,
+              ),
+            ),
+          ),
+          if (link) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.map, size: 18, color: C.cyan)),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bulan = c.i('bulan_tunggak');
+    void maps() => openMaps(context, c);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Info Pelanggan', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 4),
+        const Text('Ketuk nama, alamat, atau koordinat untuk membuka Google Maps.',
+            style: TextStyle(color: C.slate, fontSize: 12)),
+        const SizedBox(height: 10),
+        row('ID Pelanggan', c.s('id')),
+        row('Nama', c.s('nama'), onTap: maps),
+        row('Alamat', alamat(c), onTap: maps),
+        row('Koordinat', c.s('koordinat'), onTap: maps),
+        row('NIK', c.s('nik')),
+        row('No HP / WA', c.s('hp')),
+        const Divider(),
+        row('Paket', c.s('paket')),
+        row('Status', bulan == 0 ? 'Lunas' : 'Belum lunas - $bulan bulan (${rpf(bulan * c.n('harga'))})'),
+        row('Tgl pasang', dmy(c.s('tgl_pasang'))),
+        row('ONT', c.s('ont')),
+        row('SN ONT', c.s('ont_sn')),
+        row('Dropcore', '${fmtN(c.n('dropcore'))} m'),
+        row('Patchcore', '${c.i('patchcore')} pcs'),
+        if (c.s('stb').isNotEmpty) row('STB', c.s('stb')),
+        row('Teknisi', c.s('teknisi')),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit'),
+              onPressed: () => Navigator.pop(context, 'edit'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: C.rose),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Hapus'),
+              onPressed: () => Navigator.pop(context, 'hapus'),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            icon: const Icon(Icons.payments),
+            label: const Text('Pelunasan / Bayar'),
+            onPressed: () => Navigator.pop(context, 'bayar'),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ---------- Edit Data Pelanggan ----------
+class EditPelangganForm extends StatefulWidget {
+  final Rec c;
+  const EditPelangganForm(this.c, {super.key});
+  @override
+  State<EditPelangganForm> createState() => _EdPelState();
+}
+
+class _EdPelState extends State<EditPelangganForm> with Submit<EditPelangganForm> {
+  static const keys = ['nama', 'nik', 'hp', 'rtrw', 'kampung', 'kecamatan', 'kabupaten', 'koordinat', 'ont_sn', 'teknisi', 'tgl_pasang'];
+  late final Map<String, TextEditingController> t = {for (final k in keys) k: _c(widget.c.s(k))};
+
+  @override
+  void dispose() {
+    for (final c in t.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void save() {
+    if (t['nama']!.text.trim().isEmpty) {
+      toast(context, 'Nama wajib diisi');
+      return;
+    }
+    final tgl = t['tgl_pasang']!.text.trim();
+    if (tgl.isNotEmpty && DateTime.tryParse(tgl) == null) {
+      toast(context, 'Format tanggal pasang harus yyyy-MM-dd, contoh 2026-11-02');
+      return;
+    }
+    go([
+      op('Pelanggan', 'upsert', {
+        'id': widget.c.s('id'),
+        for (final k in keys) k: t[k]!.text.trim(),
+      }),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) => body('Edit Pelanggan (${widget.c.s('id')})', [
+        tf(t['nama']!, 'Nama'),
+        tf(t['nik']!, 'NIK', kb: TextInputType.number),
+        tf(t['hp']!, 'No HP / WhatsApp', kb: TextInputType.phone),
+        tf(t['rtrw']!, 'RT/RW', hint: '001/002'),
+        tf(t['kampung']!, 'Kampung'),
+        tf(t['kecamatan']!, 'Kecamatan'),
+        tf(t['kabupaten']!, 'Kabupaten'),
+        tf(t['koordinat']!, 'Titik koordinat', hint: '-7.3274, 108.2207 (atau link Google Maps)'),
+        tf(t['ont_sn']!, 'Serial No ONT'),
+        tf(t['teknisi']!, 'Nama teknisi'),
+        tf(t['tgl_pasang']!, 'Tanggal pasang (yyyy-MM-dd)'),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text('Untuk ganti paket / tunggakan gunakan menu "Ganti Paket / Ubah Tagihan". '
+              'Perangkat dan stok tidak berubah dari form ini.',
+              style: TextStyle(color: C.slate, fontSize: 12)),
+        ),
+        btn('Simpan Perubahan', save),
+      ]);
 }
 
 // ---------- Form Pasang Baru ----------
