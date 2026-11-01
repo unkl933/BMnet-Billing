@@ -24,7 +24,7 @@ class Cfg {
   static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
-  static const address = 'Jl. Kiarajangkung RT/RW : 02/04 Desa Kiarajangkung No. 88';
+  static const address = 'Jl. Utama Networking No. 88';
   static const wa = '0812-3456-7890';
   static const bank = 'BCA 1234567890';
   static const ewallet = '0812-3456-7890 (DANA / OVO / GoPay / ShopeePay)';
@@ -130,28 +130,13 @@ Map<String, dynamic> op(String sheet, String o, Map<String, dynamic> d) =>
 Map<String, dynamic> adj(String id, num delta) => op('Stok', 'adjust', {'id': id, 'delta': delta});
 
 class Api {
-    static Future<Map<String, dynamic>> get() async {
+  static Future<Map<String, dynamic>> get() async {
     if (Cfg.scriptUrl.startsWith('PASTE')) throw 'Isi Cfg.scriptUrl dengan URL Web App Apps Script';
-    
-    final client = http.Client();
-    try {
-      // Menambahkan cache-buster (cb) menggunakan timestamp agar Google membaca data terbaru
-      final url = '${Cfg.scriptUrl}?action=all&token=${Uri.encodeComponent(Cfg.token)}&cb=${DateTime.now().millisecondsSinceEpoch}';
-      
-      final req = http.Request('GET', Uri.parse(url))..followRedirects = false;
-      var res = await http.Response.fromStream(await client.send(req).timeout(const Duration(seconds: 40)));
-      
-      // Menangani HTTP 302 Redirect secara eksplisit seperti pada method POST
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers['location'] != null) {
-        res = await http.get(Uri.parse(res.headers['location']!));
-      }
-      
-      return jsonDecode(res.body) as Map<String, dynamic>;
-    } finally {
-      client.close();
-    }
+    final r = await http
+        .get(Uri.parse('${Cfg.scriptUrl}?action=all&token=${Uri.encodeComponent(Cfg.token)}'))
+        .timeout(const Duration(seconds: 40));
+    return jsonDecode(r.body) as Map<String, dynamic>;
   }
-
 
   static Future<Map<String, dynamic>> post(Map<String, dynamic> body) async {
     final client = http.Client();
@@ -177,14 +162,10 @@ class Store extends ChangeNotifier {
   String? error;
 
   List<Rec> _l(Map d, String k) {
-    final key = d.keys.firstWhere(
-      (element) => element.toString().toLowerCase() == k.toLowerCase(),
-      orElse: () => null,
-   );
-    final v = key != null ? d[key] : null;
+    final v = d[k] ?? d[k.toLowerCase()];
     return v is List ? v.map((e) => Rec(e as Map)).toList() : <Rec>[];
-   }
-  
+  }
+
   Future<void> refresh() async {
     loading = true;
     error = null;
@@ -546,11 +527,12 @@ class _ShellState extends State<Shell> {
                   Expanded(
                     child: IndexedStack(index: tab, children: [
                       DashTab(onGo: (i) => setState(() => tab = i)),
-                      const PelangganTab(),
-                      const PengeluaranTab(),
-                      const StokTab(),
-                      const PaketTab(),
-                      const KeuTab(),
+                      // JANGAN pakai const: tab harus ikut rebuild saat store berubah
+                      PelangganTab(key: const ValueKey('pel')),
+                      PengeluaranTab(key: const ValueKey('peng')),
+                      StokTab(key: const ValueKey('stok')),
+                      PaketTab(key: const ValueKey('paket')),
+                      KeuTab(key: const ValueKey('keu')),
                     ]),
                   ),
                 ]),
