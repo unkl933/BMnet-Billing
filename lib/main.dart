@@ -21,7 +21,7 @@ import 'package:printing/printing.dart';
 // ------------------------------------------------------------
 class Cfg {
   static const scriptUrl = 'https://script.google.com/macros/s/AKfycbwkQ4HbMaBlE4tVxlIUIfhNTgXgkgmzz-kWF-CHmuMMs1BB95okkMvuntsCFwx_F0M/exec';
-  static const token = ''; // samakan dengan TOKEN di Code.gs (boleh kosong)
+  static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
   static const address = 'Jl. Kiarajangkung RT/RW : 02/04 Desa Kiarajangkung No. 88';
