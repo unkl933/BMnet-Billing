@@ -346,7 +346,7 @@ Widget payHint(String m) {
   if (m == 'Transfer BCA') {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('Rekening: ${Cfg.bank} a.n. ${Cfg.atasNama}'));
   }
-  if (['DANA', 'OVO', 'GoPay', 'ShopeePay'].contains(m)) {
+  if (['DANA'].contains(m)) {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('$m: ${Cfg.ewallet} a.n. ${Cfg.atasNama}'));
   }
   return const SizedBox.shrink();
@@ -633,7 +633,7 @@ class AboutPage extends StatelessWidget {
         Center(child: Image.asset('assets/images/logo.png', height: 110)),
         const SizedBox(height: 12),
         const Center(child: Text('BM Network', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-        const Center(child: Text('Versi 1.0.10', style: TextStyle(color: C.slate))),
+        const Center(child: Text('Versi 1.0.0', style: TextStyle(color: C.slate))),
         const SizedBox(height: 20),
         const Text(
           'Aplikasi manajemen operasional ISP BM Network. Modul saat ini: Billing '
@@ -799,6 +799,12 @@ class _PelState extends State<PelangganTab> {
 
   Future<void> act(String a, Rec c) async {
     switch (a) {
+      case 'tagih':
+        previewPdf(context, 'Tagihan_${c.s('id')}', () => buildTagihan(c));
+        break;
+      case 'wa':
+        await kirimWa(context, c);
+        break;
       case 'detail':
         {
           final res = await sheet(context, PelangganDetail(c));
@@ -896,6 +902,16 @@ class _PelState extends State<PelangganTab> {
               if (menunggu) tag('Menunggu penarikan', C.amber),
               if (adaGangguan) tag('Gangguan aktif', C.rose),
             ]),
+            if (!lunas && !menunggu)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(foregroundColor: C.amber, visualDensity: VisualDensity.compact),
+                  icon: const Icon(Icons.receipt_long, size: 18),
+                  label: const Text('Kirim Nota Penagihan'),
+                  onPressed: () => act('tagih', c),
+                ),
+              ),
           ]),
         ),
         PopupMenuButton<String>(
@@ -907,11 +923,13 @@ class _PelState extends State<PelangganTab> {
                   PopupMenuItem(value: 'edit', child: Text('Edit Data')),
                   PopupMenuItem(value: 'hapus', child: Text('Hapus Pelanggan')),
                 ]
-              : const [
-                  PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
-                  PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
+              : [
+                  const PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
+                  const PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
                   PopupMenuItem(value: 'edit', child: Text('Edit Data')),
-                  PopupMenuItem(value: 'bayar', child: Text('Pelunasan / Bayar')),
+                  const PopupMenuItem(value: 'bayar', child: Text('Pelunasan / Bayar')),
+                  if (!lunas) const PopupMenuItem(value: 'tagih', child: Text('Kirim Nota Penagihan')),
+                  if (!lunas) const PopupMenuItem(value: 'wa', child: Text('Kirim Pengingat WhatsApp')),
                   PopupMenuItem(value: 'nota', child: Text('Nota Tagihan Pasang Baru')),
                   PopupMenuItem(value: 'upgrade', child: Text('Ganti Paket / Ubah Tagihan')),
                   PopupMenuItem(value: 'gangguan', child: Text('Terbitkan Tiket Gangguan')),
@@ -1051,6 +1069,17 @@ class PelangganDetail extends StatelessWidget {
             onPressed: () => Navigator.pop(context, 'bayar'),
           ),
         ),
+        if (bulan > 0) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Kirim Nota Penagihan'),
+              onPressed: () => Navigator.pop(context, 'tagih'),
+            ),
+          ),
+        ],
       ]),
     );
   }
@@ -2888,6 +2917,134 @@ Future<Uint8List> buildLaporan(Fin f, bool yearly, String periode) async {
         child: _tot(f.laba >= 0 ? 'LABA BERSIH' : 'RUGI BERSIH', rpf(f.laba), big: true),
       ),
       _footer('${Cfg.company} Billing System - Laporan Otomatis'),
+    ],
+  ));
+  return doc.save();
+}
+
+// ---- Pengingat tagihan via WhatsApp (membuka chat pelanggan dengan pesan siap kirim) ----
+Future<void> kirimWa(BuildContext c, Rec p) async {
+  var no = p.s('hp').replaceAll(RegExp(r'[^0-9]'), '');
+  if (no.isEmpty) {
+    toast(c, 'Nomor WhatsApp pelanggan belum diisi');
+    return;
+  }
+  if (no.startsWith('0')) no = '62${no.substring(1)}';
+  final bulan = p.i('bulan_tunggak');
+  final msg = 'Yth. ${p.s('nama')} (ID ${p.s('id')}),\n'
+      'Tagihan internet ${p.s('paket')} sebesar ${rpf(bulan * p.n('harga'))} ($bulan bulan) belum kami terima.\n\n'
+      'Pembayaran dapat melalui:\n'
+      '- Transfer ${Cfg.bank} a.n. ${Cfg.atasNama}\n'
+      '- E-Wallet ${Cfg.ewallet}\n'
+      '- QRIS (terlampir pada nota)\n\n'
+      'Mohon cantumkan ID Pelanggan saat membayar. Terima kasih.\n${Cfg.company}';
+  var ok = false;
+  try {
+    ok = await launchUrl(Uri.parse('https://wa.me/$no?text=${Uri.encodeComponent(msg)}'),
+        mode: LaunchMode.externalApplication);
+  } catch (_) {}
+  if (!ok && c.mounted) toast(c, 'Tidak bisa membuka WhatsApp');
+}
+
+// ---- Nota / Struk Penagihan (tunggakan pelanggan) ----
+Future<Uint8List> buildTagihan(Rec c) async {
+  final logo = await _img('assets/images/logo.png');
+  final qris = await _img('assets/images/qris.png');
+  final now = DateTime.now();
+  final harga = c.n('harga');
+  final bln = c.i('bulan_tunggak');
+  final total = bln * harga;
+  final dpp = total / (1 + Cfg.ppn);
+  final dppBln = harga / (1 + Cfg.ppn);
+  final rows = <List<String>>[];
+  if (bln <= 12) {
+    // satu baris per bulan, dihitung mundur dari bulan berjalan
+    for (var i = bln - 1; i >= 0; i--) {
+      final d = DateTime(now.year, now.month - i);
+      rows.add([
+        '${rows.length + 1}',
+        'Langganan ${c.s('paket')}\nPeriode ${monFull[d.month - 1]} ${d.year}',
+        '1 Bln',
+        rpf(dppBln),
+        rpf(dppBln),
+      ]);
+    }
+  } else {
+    rows.add(['1', 'Langganan ${c.s('paket')}\nTunggakan $bln bulan', '$bln Bln', rpf(dppBln), rpf(dpp)]);
+  }
+  final noDok = 'TG/BM/${now.year}/${now.month.toString().padLeft(2, '0')}/${c.s('id')}';
+  final doc = pw.Document();
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(32),
+    build: (_) => [
+      _hdr(logo),
+      pw.SizedBox(height: 12),
+      pw.Center(child: pw.Text('NOTA PENAGIHAN', style: _b(15, _blue))),
+      pw.Center(child: pw.Text('No. Dokumen: $noDok   |   Tanggal: ${now.day} ${monFull[now.month - 1]} ${now.year}', style: _n(9))),
+      pw.SizedBox(height: 12),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(
+          child: _box('DATA PELANGGAN', [
+            _kv('ID Pelanggan', c.s('id')),
+            _kv('Nama', c.s('nama')),
+            _kv('Alamat', alamat(c)),
+            _kv('No WhatsApp', c.s('hp')),
+          ]),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Expanded(
+          child: _box('RINCIAN TAGIHAN', [
+            _kv('Paket', c.s('paket')),
+            _kv('Tunggakan', '$bln Bulan'),
+            _kv('Status', 'BELUM LUNAS'),
+            _kv('Total Tagihan', rpf(total)),
+          ]),
+        ),
+      ]),
+      pw.SizedBox(height: 12),
+      ..._items(rows),
+      pw.SizedBox(height: 10),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red700, width: 2)),
+          child: pw.Text('BELUM LUNAS', style: _b(16, PdfColors.red700)),
+        ),
+        pw.SizedBox(
+          width: 230,
+          child: pw.Column(children: [
+            _tot('Subtotal (Excl. PPN)', rpf(dpp)),
+            _tot('PPN 11%', rpf(total - dpp)),
+            pw.Divider(),
+            _tot('TOTAL TAGIHAN', rpf(total), big: true),
+          ]),
+        ),
+      ]),
+      pw.SizedBox(height: 14),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(
+          child: _box('INFORMASI PEMBAYARAN', [
+            pw.Text('Transfer Bank: ${Cfg.bank}', style: _n(9)),
+            pw.Text('E-Wallet: ${Cfg.ewallet}', style: _n(9)),
+            pw.Text('Atas Nama: ${Cfg.atasNama}', style: _b(9)),
+            pw.SizedBox(height: 4),
+            pw.Text('Mohon cantumkan ID Pelanggan ${c.s('id')} saat membayar.', style: _n(8, PdfColors.grey700)),
+            pw.Text('Segera lakukan pembayaran agar layanan tetap aktif.', style: _n(8, PdfColors.grey700)),
+          ]),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Column(children: [
+          pw.Image(qris, width: 100, height: 100),
+          pw.Text('Scan QRIS', style: _n(8)),
+        ]),
+      ]),
+      pw.SizedBox(height: 24),
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        _sig('Pelanggan,', c.s('nama')),
+        _sig('Petugas Billing,', Cfg.company),
+      ]),
+      _footer('${Cfg.company} Billing System - Nota Penagihan Otomatis'),
     ],
   ));
   return doc.save();
