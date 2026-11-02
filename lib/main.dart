@@ -25,7 +25,9 @@ class Cfg {
   static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
-  static const address = 'Jl.Kiarajangkung, RT 002 / RW 004, Desa Kiarajangkung, Kecamatan Sukahening, Kabupaten Tasikmalaya, Provinsi Jawa Barat, Kode Pos 46155, Indonesia ';
+  static const address = 'Jl.Kiarajangkung No 04, Sukahening
+  Tasikmalaya, Jawa Barat,
+  Kode Pos 46155, Indonesia ';
   static const wa = '+62895-1988-5966';
   static const bank = 'BCA 2801971611';
   static const ewallet = '083827777207 (DANA)';
