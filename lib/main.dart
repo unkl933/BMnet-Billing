@@ -22,7 +22,7 @@ import 'package:url_launcher/url_launcher.dart';
 // ------------------------------------------------------------
 class Cfg {
   static const scriptUrl = 'https://script.google.com/macros/s/AKfycbwkQ4HbMaBlE4tVxlIUIfhNTgXgkgmzz-kWF-CHmuMMs1BB95okkMvuntsCFwx_F0M/exec';
-  static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
+  static const token = 331933''; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
   static const address = 'Jl. Kiarajangkung No. 88';
@@ -92,6 +92,53 @@ Rec? find(List<Rec> l, String? id) {
   return null;
 }
 
+// ---- Tiket gangguan: helper ----
+String statusTiket(Rec g) => g.s('status').isEmpty ? 'Sudah Diperbaiki' : g.s('status');
+bool isOpenTicket(Rec g) => statusTiket(g) == 'Belum Diperbaiki';
+String tipeTiket(Rec g) => g.s('tipe').isEmpty ? 'Pelanggan' : g.s('tipe');
+
+/// Pemakaian stok sebuah tiket: {id stok: jumlah}
+Map<String, num> matMap(String ont, String fo, num m, String patch, num pc) => {
+      if (ont.isNotEmpty) ont: 1,
+      if (fo.isNotEmpty && m > 0) fo: m,
+      if (patch.isNotEmpty && pc > 0) patch: pc,
+    };
+
+/// No tiket otomatis: TKP-20261102-001 (pelanggan) / TKJ-20261102-001 (jalur)
+String nextTiket(String tipe) {
+  final key = '${tipe == 'Jalur' ? 'TKJ' : 'TKP'}-${DateFormat('yyyyMMdd').format(DateTime.now())}-';
+  var mx = 0;
+  for (final g in store.gangguan) {
+    final n = g.s('no_tiket');
+    if (n.startsWith(key)) mx = max(mx, int.tryParse(n.substring(key.length)) ?? 0);
+  }
+  return '$key${(mx + 1).toString().padLeft(3, '0')}';
+}
+
+Future<void> tiketBaru(BuildContext c) async {
+  final t = await showModalBottomSheet<String>(
+    context: c,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          leading: const Icon(Icons.person, color: C.cyan),
+          title: const Text('Gangguan Pelanggan'),
+          onTap: () => Navigator.pop(ctx, 'Pelanggan'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.cable, color: C.amber),
+          title: const Text('Gangguan Jalur'),
+          onTap: () => Navigator.pop(ctx, 'Jalur'),
+        ),
+      ]),
+    ),
+  );
+  if (t == null || !c.mounted) return;
+  final r = await sheet(c, TiketForm(tipe: t));
+  if (r is String && c.mounted) toast(c, 'Tiket $r diterbitkan');
+}
+
 String paketLabel(Rec p) => p.s('kecepatan').isEmpty ? p.s('nama') : '${p.s('nama')} ${p.s('kecepatan')} Mbps';
 String stokName(Rec s) => s.s('merk').isNotEmpty ? s.s('merk') : s.s('nama');
 String alamat(Rec c) =>
@@ -99,9 +146,9 @@ String alamat(Rec c) =>
 
 Map<String, String> lst(List<String> l) => {for (final x in l) x: x};
 
-Map<String, String> stokItems(String jenis, {bool onlyAvail = true}) => {
+Map<String, String> stokItems(String jenis, {bool onlyAvail = true, String? keep}) => {
       for (final s in store.stok)
-        if (s.s('jenis').toLowerCase() == jenis.toLowerCase() && (!onlyAvail || s.n('jumlah') > 0))
+        if (s.s('jenis').toLowerCase() == jenis.toLowerCase() && (!onlyAvail || s.n('jumlah') > 0 || s.s('id') == keep))
           s.s('id'): '${stokName(s)} (sisa ${fmtN(s.n('jumlah'))} ${s.s('satuan')})'
     };
 
@@ -316,7 +363,10 @@ Future<void> openMaps(BuildContext c, Rec p) async {
     final valid = RegExp(r'^-?\d+(\.\d+)?,-?\d+(\.\d+)?$').hasMatch(koor);
     final q = valid
         ? koor
-        : Uri.encodeComponent('${p.s('kampung')} ${p.s('kecamatan')} ${p.s('kabupaten')}'.trim());
+        : Uri.encodeComponent(
+            '${p.s('kampung')} ${p.s('kecamatan')} ${p.s('kabupaten')}'.trim().isEmpty
+                ? p.s('alamat')
+                : '${p.s('kampung')} ${p.s('kecamatan')} ${p.s('kabupaten')}'.trim());
     uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$q');
   }
   var ok = false;
@@ -453,7 +503,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int section = 0, tab = 0;
-  static const titles = ['Dashboard', 'Pelanggan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan'];
+  static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan'];
 
   @override
   void initState() {
@@ -468,11 +518,14 @@ class _ShellState extends State<Shell> {
             onPressed: () => openPasangBaru(c), icon: const Icon(Icons.person_add), label: const Text('Pasang Baru'));
       case 2:
         return FloatingActionButton.extended(
-            onPressed: () => sheet(c, const ExpenseForm()), icon: const Icon(Icons.add), label: const Text('Pengeluaran'));
+            onPressed: () => tiketBaru(c), icon: const Icon(Icons.add_alert), label: const Text('Tiket Baru'));
       case 3:
         return FloatingActionButton.extended(
-            onPressed: () => sheet(c, const StokForm()), icon: const Icon(Icons.add), label: const Text('Stok'));
+            onPressed: () => sheet(c, const ExpenseForm()), icon: const Icon(Icons.add), label: const Text('Pengeluaran'));
       case 4:
+        return FloatingActionButton.extended(
+            onPressed: () => sheet(c, const StokForm()), icon: const Icon(Icons.add), label: const Text('Stok'));
+      case 5:
         return FloatingActionButton.extended(
             onPressed: () => sheet(c, const PaketForm()), icon: const Icon(Icons.add), label: const Text('Paket'));
     }
@@ -551,6 +604,7 @@ class _ShellState extends State<Shell> {
                       DashTab(onGo: (i) => setState(() => tab = i)),
                       // JANGAN pakai const: tab harus ikut rebuild saat store berubah
                       PelangganTab(key: const ValueKey('pel')),
+                      GangguanTab(key: const ValueKey('ggn')),
                       PengeluaranTab(key: const ValueKey('peng')),
                       StokTab(key: const ValueKey('stok')),
                       PaketTab(key: const ValueKey('paket')),
@@ -560,18 +614,10 @@ class _ShellState extends State<Shell> {
                 ]),
           floatingActionButton: billing ? fab(context) : null,
           bottomNavigationBar: billing
-              ? NavigationBar(
-                  selectedIndex: tab,
-                  labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-                  onDestinationSelected: (i) => setState(() => tab = i),
-                  destinations: const [
-                    NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Beranda'),
-                    NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Pelanggan'),
-                    NavigationDestination(icon: Icon(Icons.payments_outlined), selectedIcon: Icon(Icons.payments), label: 'Pengeluaran'),
-                    NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Stok'),
-                    NavigationDestination(icon: Icon(Icons.router_outlined), selectedIcon: Icon(Icons.router), label: 'Paket'),
-                    NavigationDestination(icon: Icon(Icons.account_balance_outlined), selectedIcon: Icon(Icons.account_balance), label: 'Keuangan'),
-                  ],
+              ? BottomNav(
+                  index: tab,
+                  alerts: store.gangguan.where(isOpenTicket).length,
+                  onTap: (i) => setState(() => tab = i),
                 )
               : null,
         );
@@ -587,7 +633,7 @@ class AboutPage extends StatelessWidget {
         Center(child: Image.asset('assets/images/logo.png', height: 110)),
         const SizedBox(height: 12),
         const Center(child: Text('BM Network', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-        const Center(child: Text('Versi 1.0.0', style: TextStyle(color: C.slate))),
+        const Center(child: Text('Versi 1.0.10', style: TextStyle(color: C.slate))),
         const SizedBox(height: 20),
         const Text(
           'Aplikasi manajemen operasional ISP BM Network. Modul saat ini: Billing '
@@ -614,6 +660,7 @@ class DashTab extends StatelessWidget {
     bool sameMonth(DateTime? d, DateTime t) => d != null && d.year == t.year && d.month == t.month;
     final baru = store.pelanggan.where((c) => sameMonth(DateTime.tryParse(c.s('tgl_pasang')), now)).length;
     final belum = store.pelanggan.where((c) => c.i('bulan_tunggak') > 0).length;
+    final gOpen = store.gangguan.where(isOpenTicket).length;
     final inc = store.transaksi
         .where((t) => sameMonth(DateTime.tryParse(t.s('tgl')), now))
         .fold<num>(0, (a, t) => a + t.n('nominal'));
@@ -626,10 +673,11 @@ class DashTab extends StatelessWidget {
     final quick = <(IconData, String, Color, VoidCallback)>[
       (Icons.person_add, 'Pasang Baru', C.emerald, () => openPasangBaru(context)),
       (Icons.people, 'Pelanggan', C.cyan, () => onGo(1)),
-      (Icons.payments, 'Pengeluaran', C.rose, () => onGo(2)),
-      (Icons.inventory_2, 'Stok Gudang', C.amber, () => onGo(3)),
-      (Icons.router, 'Paket', C.cyan, () => onGo(4)),
-      (Icons.account_balance, 'Keuangan', C.emerald, () => onGo(5)),
+      (Icons.report_problem, 'Gangguan', C.rose, () => onGo(2)),
+      (Icons.payments, 'Pengeluaran', C.rose, () => onGo(3)),
+      (Icons.inventory_2, 'Stok Gudang', C.amber, () => onGo(4)),
+      (Icons.router, 'Paket', C.cyan, () => onGo(5)),
+      (Icons.account_balance, 'Keuangan', C.emerald, () => onGo(6)),
     ];
 
     return RefreshIndicator(
@@ -642,6 +690,10 @@ class DashTab extends StatelessWidget {
         Row(children: [
           Expanded(child: Metric('Belum Lunas', '$belum', C.rose, Icons.warning_amber)),
           Expanded(child: Metric('Pemasukan Bulan Ini', rpf(inc), C.amber, Icons.trending_up)),
+        ]),
+        Row(children: [
+          Expanded(child: Metric('Gangguan Belum Diperbaiki', '$gOpen', gOpen > 0 ? C.rose : C.emerald, Icons.report_problem)),
+          Expanded(child: Metric('Total Tiket Gangguan', '${store.gangguan.length}', C.cyan, Icons.confirmation_number)),
         ]),
         Panel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -784,8 +836,11 @@ class _PelState extends State<PelangganTab> {
         await sheet(context, UpgradeForm(c));
         break;
       case 'gangguan':
-        await sheet(context, GangguanForm(c));
-        break;
+        {
+          final r = await sheet(context, TiketForm(tipe: 'Pelanggan', cust: c));
+          if (r is String && mounted) toast(context, 'Tiket $r diterbitkan');
+          break;
+        }
       case 'berhenti':
         await sheet(context, BerhentiForm(c));
         break;
@@ -811,6 +866,7 @@ class _PelState extends State<PelangganTab> {
     final bulan = c.i('bulan_tunggak');
     final lunas = bulan == 0;
     final menunggu = c.s('aktif') == 'Menunggu Penarikan';
+    final adaGangguan = store.gangguan.any((g) => g.s('pelanggan_id') == c.s('id') && isOpenTicket(g));
     return Panel(
       onTap: () => act('detail', c),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -838,6 +894,7 @@ class _PelState extends State<PelangganTab> {
               tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
               if (!lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
               if (menunggu) tag('Menunggu penarikan', C.amber),
+              if (adaGangguan) tag('Gangguan aktif', C.rose),
             ]),
           ]),
         ),
@@ -857,7 +914,7 @@ class _PelState extends State<PelangganTab> {
                   PopupMenuItem(value: 'bayar', child: Text('Pelunasan / Bayar')),
                   PopupMenuItem(value: 'nota', child: Text('Nota Tagihan Pasang Baru')),
                   PopupMenuItem(value: 'upgrade', child: Text('Ganti Paket / Ubah Tagihan')),
-                  PopupMenuItem(value: 'gangguan', child: Text('Gangguan / Perbaikan')),
+                  PopupMenuItem(value: 'gangguan', child: Text('Terbitkan Tiket Gangguan')),
                   PopupMenuItem(value: 'berhenti', child: Text('Berhenti Berlangganan')),
                   PopupMenuItem(value: 'hapus', child: Text('Hapus Pelanggan')),
                 ],
@@ -1357,68 +1414,140 @@ class _UpState extends State<UpgradeForm> with Submit<UpgradeForm> {
       ]);
 }
 
-// ---------- Gangguan / Perbaikan ----------
-class GangguanForm extends StatefulWidget {
-  final Rec c;
-  const GangguanForm(this.c, {super.key});
+// ---------- Tiket Gangguan: form terbit / edit ----------
+class TiketForm extends StatefulWidget {
+  final String tipe; // 'Pelanggan' | 'Jalur'
+  final Rec? cust, edit;
+  const TiketForm({super.key, this.tipe = 'Pelanggan', this.cust, this.edit});
   @override
-  State<GangguanForm> createState() => _GgState();
+  State<TiketForm> createState() => _TiketState();
 }
 
-class _GgState extends State<GangguanForm> with Submit<GangguanForm> {
-  late final sn = _c(widget.c.s('ont_sn'));
-  final teknisi = _c(), catatan = _c(), drop = _c('0'), patch = _c('0');
-  String jenis = 'Redaman';
-  String? ontId, foId;
+class _TiketState extends State<TiketForm> with Submit<TiketForm> {
+  static const jenisList = ['Redaman', 'LOS', 'Kabel Putus', 'Perangkat Rusak', 'Lainnya'];
+  late final String tipe = widget.edit != null ? tipeTiket(widget.edit!) : widget.tipe;
+  final jalur = _c(), ket = _c(), teknisi = _c(), sn = _c(), fom = _c('0'), pcs = _c('0');
+  String jenis = 'Redaman', custId = '', ontId = '', foId = '', patchId = '';
+
+  Rec? get cust => find(store.pelanggan, custId);
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.edit;
+    if (e != null) {
+      custId = e.s('pelanggan_id');
+      if (e.s('jenis').isNotEmpty) jenis = e.s('jenis');
+      jalur.text = e.s('jalur');
+      ket.text = e.s('keterangan').isNotEmpty ? e.s('keterangan') : e.s('catatan');
+      teknisi.text = e.s('teknisi');
+      sn.text = e.s('sn_ont');
+      ontId = e.s('ont_id');
+      foId = e.s('fo_id');
+      patchId = e.s('patch_id');
+      if (e.n('fo_m') > 0) fom.text = fmtN(e.n('fo_m'));
+      if (e.n('patch_pcs') > 0) pcs.text = '${e.i('patch_pcs')}';
+    } else if (widget.cust != null) {
+      custId = widget.cust!.s('id');
+      sn.text = widget.cust!.s('ont_sn');
+    }
+  }
 
   @override
   void dispose() {
-    for (final c in [sn, teknisi, catatan, drop, patch]) {
+    for (final c in [jalur, ket, teknisi, sn, fom, pcs]) {
       c.dispose();
     }
     super.dispose();
   }
 
+  Map<String, String> opt(Map<String, String> m) => {'': '- Tidak pakai -', ...m};
+
   void save() {
-    final c = widget.c;
-    final m = pn(drop);
-    final pc = pn(patch).toInt();
-    final fo = find(store.stok, foId);
-    final ont = find(store.stok, ontId);
+    final e = widget.edit;
+    final c = cust;
+    final isP = tipe == 'Pelanggan';
+    if (isP && c == null && e == null) {
+      toast(context, 'Pilih pelanggan terlebih dahulu');
+      return;
+    }
+    if (!isP && jalur.text.trim().isEmpty) {
+      toast(context, 'Isi jalur yang mengalami gangguan');
+      return;
+    }
     if (teknisi.text.trim().isEmpty) {
-      toast(context, 'Isi nama teknisi');
+      toast(context, 'Isi nama teknisi yang ditugaskan');
       return;
     }
-    if (m > 0 && (fo == null || fo.n('jumlah') < m)) {
-      toast(context, 'Stok kabel FO tidak cukup / belum dipilih');
+    final m = pn(fom);
+    final pc = pn(pcs).toInt();
+    if (m > 0 && foId.isEmpty) {
+      toast(context, 'Pilih kabel FO yang dipakai');
       return;
     }
-    Rec? pat;
-    if (pc > 0) {
-      pat = store.stok.where((s) => s.s('jenis').toLowerCase() == 'patchcore' && s.n('jumlah') >= pc).firstOrNull;
-      if (pat == null) {
-        toast(context, 'Stok patchcore tidak cukup');
+    if (pc > 0 && patchId.isEmpty) {
+      toast(context, 'Pilih patchcore yang dipakai');
+      return;
+    }
+    final oldM = e == null
+        ? <String, num>{}
+        : matMap(e.s('ont_id'), e.s('fo_id'), e.n('fo_m'), e.s('patch_id'), e.n('patch_pcs'));
+    final newM = matMap(ontId, foId, m, patchId, pc);
+    // validasi stok: stok sekarang + material versi lama yang dikembalikan
+    for (final k in newM.keys) {
+      final s = find(store.stok, k);
+      if (s == null || s.n('jumlah') + (oldM[k] ?? 0) < newM[k]!) {
+        toast(context, 'Stok ${s == null ? 'tidak ditemukan' : stokName(s)} tidak cukup');
         return;
       }
     }
-    final now = ymd(DateTime.now());
-    final ops = <Map<String, dynamic>>[
-      op('Gangguan', 'upsert', {
-        'id': newId('G'),
-        'tgl': now,
-        'pelanggan_id': c.s('id'),
-        'nama': c.s('nama'),
-        'sn_ont': sn.text.trim(),
-        'jenis': jenis,
-        'teknisi': teknisi.text.trim(),
-        'ganti_ont': ont == null ? '' : stokName(ont),
-        'catatan': catatan.text.trim(),
-      }),
-      op('Material', 'upsert', {
-        'id': newId('M'),
-        'tgl': now,
-        'pelanggan_id': c.s('id'),
-        'nama': c.s('nama'),
+    final ops = <Map<String, dynamic>>[];
+    for (final k in {...oldM.keys, ...newM.keys}) {
+      final d = (oldM[k] ?? 0) - (newM[k] ?? 0); // positif = kembali ke stok
+      if (d != 0) ops.add(adj(k, d));
+    }
+
+    final ont = find(store.stok, ontId);
+    final id = e?.s('id') ?? newId('G');
+    final oldNo = e?.s('no_tiket') ?? '';
+    final no = oldNo.isNotEmpty ? oldNo : nextTiket(tipe);
+    final tgl = (e != null && e.s('tgl').isNotEmpty) ? e.s('tgl') : ymd(DateTime.now());
+    final nama = isP ? (c?.s('nama') ?? e?.s('nama') ?? '') : '';
+    final pid = isP ? (c?.s('id') ?? e?.s('pelanggan_id') ?? '') : '';
+    final status = e == null ? 'Belum Diperbaiki' : statusTiket(e);
+
+    ops.add(op('Gangguan', 'upsert', {
+      'id': id,
+      'no_tiket': no,
+      'tgl': tgl,
+      'tipe': tipe,
+      'pelanggan_id': pid,
+      'nama': nama,
+      'jenis': isP ? jenis : 'Gangguan Jalur',
+      'keterangan': ket.text.trim(),
+      'alamat': isP ? (c != null ? alamat(c) : (e?.s('alamat') ?? '')) : '',
+      'koordinat': isP ? (c?.s('koordinat') ?? e?.s('koordinat') ?? '') : '',
+      'hp': isP ? (c?.s('hp') ?? e?.s('hp') ?? '') : '',
+      'jalur': isP ? '' : jalur.text.trim(),
+      'sn_ont': sn.text.trim(),
+      'teknisi': teknisi.text.trim(),
+      'ont_id': ontId,
+      'ont': ont == null ? '' : stokName(ont),
+      'fo_id': foId,
+      'fo_m': m,
+      'patch_id': patchId,
+      'patch_pcs': pc,
+      'status': status,
+    }));
+
+    // catatan pemakaian material (untuk laporan keuangan)
+    final matId = 'MT-$id';
+    if (newM.isNotEmpty) {
+      ops.add(op('Material', 'upsert', {
+        'id': matId,
+        'tgl': tgl,
+        'pelanggan_id': pid,
+        'nama': isP ? nama : 'Jalur: ${jalur.text.trim()}',
         'ont': ont == null ? '' : stokName(ont),
         'ont_sn': sn.text.trim(),
         'dropcore': m,
@@ -1426,35 +1555,386 @@ class _GgState extends State<GangguanForm> with Submit<GangguanForm> {
         'stb': '',
         'teknisi': teknisi.text.trim(),
         'jenis': 'Perbaikan',
+      }));
+    } else if (e != null) {
+      ops.add(op('Material', 'delete', {'id': matId}));
+    }
+
+    // tiket yang sudah selesai lalu diedit: sinkronkan modem baru ke data pelanggan
+    if (e != null && isP && ont != null && status == 'Sudah Diperbaiki' && find(store.pelanggan, pid) != null) {
+      ops.add(op('Pelanggan', 'upsert', {'id': pid, 'ont': stokName(ont), 'ont_id': ontId, 'ont_sn': sn.text.trim()}));
+    }
+    go(ops, e == null ? no : null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.edit;
+    final c = cust;
+    final isP = tipe == 'Pelanggan';
+    final nama = c?.s('nama') ?? e?.s('nama') ?? '';
+    final pid = c?.s('id') ?? e?.s('pelanggan_id') ?? '';
+    final almt = c != null ? alamat(c) : (e?.s('alamat') ?? '');
+    final koor = c?.s('koordinat') ?? e?.s('koordinat') ?? '';
+    return body(
+      e == null ? 'Terbitkan Tiket Gangguan ${isP ? 'Pelanggan' : 'Jalur'}' : 'Edit Tiket ${e.s('no_tiket')}',
+      [
+        if (isP && e == null && widget.cust == null)
+          dd('Pilih pelanggan', custId, {for (final p in store.pelanggan) p.s('id'): '${p.s('nama')} (${p.s('id')})'}, (v) {
+            setState(() {
+              custId = v ?? '';
+              sn.text = find(store.pelanggan, v)?.s('ont_sn') ?? '';
+            });
+          }),
+        if (isP && (c != null || e != null))
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('$nama ($pid)', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(almt, style: const TextStyle(color: C.slate, fontSize: 12)),
+              if (koor.isNotEmpty) Text('Koordinat: $koor', style: const TextStyle(color: C.slate, fontSize: 12)),
+            ]),
+          ),
+        if (isP)
+          dd('Jenis gangguan', jenis, lst(jenisList), (v) => setState(() => jenis = v!))
+        else
+          tf(jalur, 'Jalur yang mengalami gangguan', hint: 'contoh: Jalur ODP-03 Kp. Sirnamanah'),
+        tf(ket, 'Keterangan gangguan', lines: 3),
+        tf(teknisi, 'Teknisi yang ditugaskan'),
+        if (isP) tf(sn, 'Serial Number (SN) ONT'),
+        const Divider(),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10, top: 4),
+          child: Text('Material yang dipakai (opsional, otomatis memotong stok gudang)',
+              style: TextStyle(color: C.slate, fontSize: 12)),
+        ),
+        dd('Modem / ONT', ontId, opt(stokItems('ONT', keep: ontId)), (v) => setState(() => ontId = v ?? '')),
+        dd('Kabel FO', foId, opt(stokItems('FO', keep: foId)), (v) => setState(() => foId = v ?? '')),
+        tf(fom, 'FO terpakai (meter)', kb: numKb),
+        dd('Patchcore', patchId, opt(stokItems('Patchcore', keep: patchId)), (v) => setState(() => patchId = v ?? '')),
+        tf(pcs, 'Patchcore terpakai (pcs)', kb: TextInputType.number),
+        btn(e == null ? 'Terbitkan Tiket Gangguan' : 'Simpan Perubahan', save),
+      ],
+    );
+  }
+}
+
+// ---------- Tandai berhasil diperbaiki ----------
+class SelesaiForm extends StatefulWidget {
+  final Rec t;
+  const SelesaiForm(this.t, {super.key});
+  @override
+  State<SelesaiForm> createState() => _SelState();
+}
+
+class _SelState extends State<SelesaiForm> with Submit<SelesaiForm> {
+  final cat = _c();
+
+  @override
+  void dispose() {
+    cat.dispose();
+    super.dispose();
+  }
+
+  void save() {
+    final t = widget.t;
+    final ops = <Map<String, dynamic>>[
+      op('Gangguan', 'upsert', {
+        'id': t.s('id'),
+        'status': 'Sudah Diperbaiki',
+        'tgl_selesai': ymd(DateTime.now()),
+        'catatan_selesai': cat.text.trim(),
       }),
     ];
-    if (ont != null) {
-      ops.add(adj(ont.s('id'), -1));
-      ops.add(op('Pelanggan', 'upsert',
-          {'id': c.s('id'), 'ont': stokName(ont), 'ont_id': ont.s('id'), 'ont_sn': sn.text.trim()}));
-    } else {
-      ops.add(op('Pelanggan', 'upsert', {'id': c.s('id'), 'ont_sn': sn.text.trim()}));
+    // modem pengganti tercatat pada data pelanggan setelah perbaikan selesai
+    if (tipeTiket(t) == 'Pelanggan' && t.s('ont_id').isNotEmpty && find(store.pelanggan, t.s('pelanggan_id')) != null) {
+      ops.add(op('Pelanggan', 'upsert', {
+        'id': t.s('pelanggan_id'),
+        'ont': t.s('ont'),
+        'ont_id': t.s('ont_id'),
+        'ont_sn': t.s('sn_ont'),
+      }));
     }
-    if (m > 0) ops.add(adj(fo!.s('id'), -m));
-    if (pat != null) ops.add(adj(pat.s('id'), -pc));
     go(ops);
   }
 
   @override
-  Widget build(BuildContext context) => body('Gangguan - ${widget.c.s('nama')}', [
-        tf(sn, 'Serial Number (SN) ONT', hint: 'isi SN baru bila ONT diganti'),
-        dd('Jenis gangguan', jenis, lst(['Redaman', 'LOS', 'Lainnya']), (v) => setState(() => jenis = v!)),
-        tf(teknisi, 'Teknisi penanggung jawab'),
-        tf(catatan, 'Catatan', lines: 2),
-        const Divider(),
-        const Text('Penggantian material (opsional, memotong stok)', style: TextStyle(color: C.slate)),
-        const SizedBox(height: 10),
-        dd('Ganti ONT dengan', ontId, stokItems('ONT'), (v) => setState(() => ontId = v)),
-        dd('Kabel FO tambahan', foId, stokItems('FO'), (v) => setState(() => foId = v)),
-        tf(drop, 'Dropcore terpakai (meter)', kb: numKb),
-        tf(patch, 'Patchcore terpakai (pcs)', kb: TextInputType.number),
-        btn('Simpan Laporan Gangguan', save),
-      ]);
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final who = tipeTiket(t) == 'Pelanggan' ? '${t.s('nama')} (${t.s('pelanggan_id')})' : 'Jalur ${t.s('jalur')}';
+    return body('Berhasil Diperbaiki', [
+      Text('${t.s('no_tiket')}\n$who\nTeknisi: ${t.s('teknisi')}'),
+      const SizedBox(height: 14),
+      tf(cat, 'Catatan hasil perbaikan (opsional)', lines: 3),
+      btn('Tandai Sudah Diperbaiki', save),
+    ]);
+  }
+}
+
+// ---------- Tab Gangguan ----------
+class GangguanTab extends StatefulWidget {
+  const GangguanTab({super.key});
+  @override
+  State<GangguanTab> createState() => _GgTabState();
+}
+
+class _GgTabState extends State<GangguanTab> {
+  String tipeF = 'Semua', statF = 'Semua';
+
+  Future<void> act(String a, Rec g) async {
+    switch (a) {
+      case 'selesai':
+        await sheet(context, SelesaiForm(g));
+        break;
+      case 'edit':
+        await sheet(context, TiketForm(edit: g));
+        break;
+      case 'maps':
+        await openMaps(context, g);
+        break;
+      case 'buka':
+        {
+          await exec(context, [
+            op('Gangguan', 'upsert', {'id': g.s('id'), 'status': 'Belum Diperbaiki', 'tgl_selesai': '', 'catatan_selesai': ''}),
+          ], ok: 'Tiket dibuka kembali');
+          break;
+        }
+      case 'hapus':
+        {
+          final open = isOpenTicket(g);
+          final yes = await confirm(
+            context,
+            'Hapus tiket ${g.s('no_tiket')}?',
+            open
+                ? 'Tiket dihapus dan material yang sudah dipotong dikembalikan ke stok.'
+                : 'Tiket dihapus. Material tidak dikembalikan ke stok karena sudah terpakai.',
+          );
+          if (!yes || !mounted) return;
+          final ops = <Map<String, dynamic>>[];
+          if (open) {
+            matMap(g.s('ont_id'), g.s('fo_id'), g.n('fo_m'), g.s('patch_id'), g.n('patch_pcs'))
+                .forEach((k, v) => ops.add(adj(k, v)));
+            ops.add(op('Material', 'delete', {'id': 'MT-${g.s('id')}'}));
+          }
+          ops.add(op('Gangguan', 'delete', {'id': g.s('id')}));
+          await exec(context, ops, ok: 'Tiket dihapus');
+          break;
+        }
+    }
+  }
+
+  Widget dot(bool red) {
+    final col = red ? C.rose : C.emerald;
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: col,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: col.withValues(alpha: .6), blurRadius: 6)],
+      ),
+    );
+  }
+
+  Widget chips(List<String> opts, String cur, ValueChanged<String> on) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(children: [
+          for (final x in opts)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(label: Text(x), selected: cur == x, onSelected: (_) => on(x)),
+            ),
+        ]),
+      );
+
+  Widget card(Rec g) {
+    final open = isOpenTicket(g);
+    final isP = tipeTiket(g) == 'Pelanggan';
+    final ket = g.s('keterangan').isNotEmpty ? g.s('keterangan') : g.s('catatan');
+    final mats = <String>[
+      if (g.s('ont').isNotEmpty) 'Modem: ${g.s('ont')}',
+      if (g.n('fo_m') > 0) 'FO: ${fmtN(g.n('fo_m'))} m',
+      if (g.n('patch_pcs') > 0) 'Patchcore: ${g.i('patch_pcs')} pcs',
+    ];
+    return Panel(
+      onTap: () => act('edit', g),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(top: 4), child: dot(open)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text(g.s('no_tiket').isEmpty ? '-' : g.s('no_tiket'), style: const TextStyle(fontWeight: FontWeight.bold)),
+              tag(isP ? 'Pelanggan' : 'Jalur', isP ? C.cyan : C.amber),
+              tag(open ? 'Belum diperbaiki' : 'Sudah diperbaiki', open ? C.rose : C.emerald),
+            ]),
+            const SizedBox(height: 6),
+            if (isP) ...[
+              Text('${g.s('nama')} (${g.s('pelanggan_id')})', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text('Jenis gangguan: ${g.s('jenis')}', style: const TextStyle(fontSize: 13)),
+              const SizedBox(height: 2),
+              GestureDetector(
+                onTap: () => openMaps(context, g),
+                child: Text.rich(TextSpan(children: [
+                  const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(padding: EdgeInsets.only(right: 3), child: Icon(Icons.place, size: 13, color: C.cyan))),
+                  TextSpan(text: g.s('alamat').isEmpty ? '-' : g.s('alamat'), style: const TextStyle(color: C.slate, fontSize: 12)),
+                ])),
+              ),
+              if (g.s('koordinat').isNotEmpty)
+                Text('Koordinat: ${g.s('koordinat')}', style: const TextStyle(color: C.slate, fontSize: 12)),
+            ] else
+              Text('Jalur: ${g.s('jalur')}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (ket.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('Keterangan: $ket', style: const TextStyle(fontSize: 13)),
+            ],
+            const SizedBox(height: 4),
+            Text('Teknisi: ${g.s('teknisi').isEmpty ? '-' : g.s('teknisi')}', style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 6),
+            if (mats.isEmpty)
+              const Text('Material: -', style: TextStyle(color: C.slate, fontSize: 12))
+            else
+              Wrap(spacing: 6, runSpacing: 4, children: [for (final m in mats) tag(m, C.cyan)]),
+            const SizedBox(height: 4),
+            Text('Tiket: ${dmy(g.s('tgl'))}', style: const TextStyle(color: C.slate, fontSize: 11)),
+            if (!open)
+              Text(
+                'Selesai ${dmy(g.s('tgl_selesai'))}${g.s('catatan_selesai').isEmpty ? '' : ' - ${g.s('catatan_selesai')}'}',
+                style: const TextStyle(color: C.emerald, fontSize: 12),
+              ),
+            if (open)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: C.emerald, foregroundColor: Colors.white),
+                  icon: const Icon(Icons.check_circle, size: 18),
+                  label: const Text('Berhasil Diperbaiki'),
+                  onPressed: () => act('selesai', g),
+                ),
+              ),
+          ]),
+        ),
+        PopupMenuButton<String>(
+          onSelected: (a) => act(a, g),
+          itemBuilder: (_) => [
+            if (open) const PopupMenuItem(value: 'selesai', child: Text('Berhasil Diperbaiki')),
+            const PopupMenuItem(value: 'edit', child: Text('Edit Tiket')),
+            if (isP || g.s('koordinat').isNotEmpty) const PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
+            if (!open) const PopupMenuItem(value: 'buka', child: Text('Buka Kembali Tiket')),
+            const PopupMenuItem(value: 'hapus', child: Text('Hapus Tiket')),
+          ],
+        ),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nOpen = store.gangguan.where(isOpenTicket).length;
+    final nDone = store.gangguan.length - nOpen;
+    final list = store.gangguan.where((g) {
+      final okT = tipeF == 'Semua' || tipeTiket(g) == tipeF;
+      final okS = statF == 'Semua' || (statF == 'Belum diperbaiki') == isOpenTicket(g);
+      return okT && okS;
+    }).toList()
+      ..sort((a, b) {
+        final oa = isOpenTicket(a) ? 0 : 1, ob = isOpenTicket(b) ? 0 : 1;
+        if (oa != ob) return oa - ob;
+        final d = b.s('tgl').compareTo(a.s('tgl'));
+        return d != 0 ? d : b.s('no_tiket').compareTo(a.s('no_tiket'));
+      });
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(7, 4, 7, 0),
+        child: Row(children: [
+          Expanded(child: Metric('Belum Diperbaiki', '$nOpen', nOpen > 0 ? C.rose : C.emerald, Icons.report_problem)),
+          Expanded(child: Metric('Sudah Diperbaiki', '$nDone', C.emerald, Icons.check_circle)),
+        ]),
+      ),
+      chips(['Semua', 'Pelanggan', 'Jalur'], tipeF, (v) => setState(() => tipeF = v)),
+      const SizedBox(height: 4),
+      chips(['Semua', 'Belum diperbaiki', 'Sudah diperbaiki'], statF, (v) => setState(() => statF = v)),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: store.refresh,
+          child: list.isEmpty
+              ? ListView(children: const [SizedBox(height: 160), Center(child: Text('Belum ada tiket gangguan'))])
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 90, top: 4),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) => card(list[i]),
+                ),
+        ),
+      ),
+    ]);
+  }
+}
+
+// ---------- Navigasi bawah (7 menu, titik merah di Gangguan bila ada tiket aktif) ----------
+class BottomNav extends StatelessWidget {
+  final int index, alerts;
+  final ValueChanged<int> onTap;
+  const BottomNav({super.key, required this.index, required this.alerts, required this.onTap});
+
+  static const items = [
+    (Icons.dashboard_outlined, Icons.dashboard, 'Beranda'),
+    (Icons.people_outline, Icons.people, 'Pelanggan'),
+    (Icons.report_problem_outlined, Icons.report_problem, 'Gangguan'),
+    (Icons.payments_outlined, Icons.payments, 'Biaya'),
+    (Icons.inventory_2_outlined, Icons.inventory_2, 'Stok'),
+    (Icons.router_outlined, Icons.router, 'Paket'),
+    (Icons.account_balance_outlined, Icons.account_balance, 'Keuangan'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: C.card,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 62,
+            child: Row(children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onTap(i),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Stack(clipBehavior: Clip.none, children: [
+                        Icon(index == i ? items[i].$2 : items[i].$1, size: 24, color: index == i ? C.emerald : C.slate),
+                        if (i == 2 && alerts > 0)
+                          Positioned(
+                            right: -3,
+                            top: -2,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(color: C.rose, shape: BoxShape.circle),
+                            ),
+                          ),
+                      ]),
+                      const SizedBox(height: 3),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(items[i].$3,
+                              style: TextStyle(fontSize: 10, color: index == i ? C.emerald : C.slate)),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      );
 }
 
 // ---------- Berhenti Berlangganan ----------
