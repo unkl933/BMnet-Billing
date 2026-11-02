@@ -25,16 +25,16 @@ class Cfg {
   static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
-  static const address = 'Jl. Kiarajangkung No. 88';
+  static const address = 'Jl.Kiarajangkung, RT 002 / RW 004, Desa Kiarajangkung, Kecamatan Sukahening, Kabupaten Tasikmalaya, Provinsi Jawa Barat, Kode Pos 46155, Indonesia ';
   static const wa = '0812-3456-7890';
-  static const bank = 'BCA 1234567890';
-  static const ewallet = '0812-3456-7890 (DANA / OVO / GoPay / ShopeePay)';
-  static const atasNama = 'BM Network';
+  static const bank = 'BCA 2801971611';
+  static const ewallet = '083827777207 (DANA)';
+  static const atasNama = 'IRSYAM AUFAR ZUHDAN';
   static const ppn = 0.11;
   static const kategori = ['Belanja Aset', 'Operasional', 'Gaji Karyawan', 'Hutang', 'Maintenance'];
   static const jenisBarang = ['ONT', 'OLT', 'Mikrotik', 'FO', 'Patchcore', 'STB', 'Selongsong', 'Aksesoris'];
-  static const metodeBayar = ['Tunai', 'Transfer BCA', 'QRIS', 'DANA', 'OVO', 'GoPay', 'ShopeePay'];
-  static const metodePasang = ['Belum Dibayar', 'Tunai', 'QRIS', 'DANA', 'OVO', 'GoPay', 'ShopeePay'];
+  static const metodeBayar = ['Tunai', 'Transfer BCA', 'QRIS', 'DANA'];
+  static const metodePasang = ['Belum Dibayar', 'Tunai', 'QRIS', 'DANA'];
 }
 
 class C {
@@ -346,7 +346,7 @@ Widget payHint(String m) {
   if (m == 'Transfer BCA') {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('Rekening: ${Cfg.bank} a.n. ${Cfg.atasNama}'));
   }
-  if (['DANA', 'OVO', 'GoPay', 'ShopeePay'].contains(m)) {
+  if (['DANA'].contains(m)) {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('$m: ${Cfg.ewallet} a.n. ${Cfg.atasNama}'));
   }
   return const SizedBox.shrink();
