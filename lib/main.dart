@@ -346,7 +346,7 @@ Widget payHint(String m) {
   if (m == 'Transfer BCA') {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('Rekening: ${Cfg.bank} a.n. ${Cfg.atasNama}'));
   }
-  if (['DANA'].contains(m)) {
+  if (['DANA', 'OVO', 'GoPay', 'ShopeePay'].contains(m)) {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('$m: ${Cfg.ewallet} a.n. ${Cfg.atasNama}'));
   }
   return const SizedBox.shrink();
