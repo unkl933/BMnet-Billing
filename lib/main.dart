@@ -503,7 +503,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int section = 0, tab = 0;
-  static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan'];
+  static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan', 'Sales'];
 
   @override
   void initState() {
@@ -609,6 +609,7 @@ class _ShellState extends State<Shell> {
                       StokTab(key: const ValueKey('stok')),
                       PaketTab(key: const ValueKey('paket')),
                       KeuTab(key: const ValueKey('keu')),
+                      SalesTab(key: const ValueKey('sales')),
                     ]),
                   ),
                 ]),
@@ -899,6 +900,7 @@ class _PelState extends State<PelangganTab> {
               tag(c.s('paket').isEmpty ? '-' : c.s('paket'), C.cyan),
               tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
               if (!lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
+              if (c.s('sales').isNotEmpty) tag('Sales: ${c.s('sales')}', C.emerald),
               if (menunggu) tag('Menunggu penarikan', C.amber),
               if (adaGangguan) tag('Gangguan aktif', C.rose),
             ]),
@@ -944,7 +946,7 @@ class _PelState extends State<PelangganTab> {
   @override
   Widget build(BuildContext context) {
     final list = store.pelanggan.where((c) {
-      final hit = '${c.s('id')} ${c.s('nama')} ${c.s('kampung')} ${c.s('hp')}'.toLowerCase().contains(q.toLowerCase());
+      final hit = '${c.s('id')} ${c.s('nama')} ${c.s('kampung')} ${c.s('hp')} ${c.s('sales')}'.toLowerCase().contains(q.toLowerCase());
       final lunas = c.i('bulan_tunggak') == 0;
       return hit && (f == 'Semua' || (f == 'Lunas') == lunas);
     }).toList();
@@ -1041,6 +1043,7 @@ class PelangganDetail extends StatelessWidget {
         row('Patchcore', '${c.i('patchcore')} pcs'),
         if (c.s('stb').isNotEmpty) row('STB', c.s('stb')),
         row('Teknisi', c.s('teknisi')),
+        row('Nama Sales', c.s('sales')),
         const SizedBox(height: 14),
         Row(children: [
           Expanded(
@@ -1094,7 +1097,7 @@ class EditPelangganForm extends StatefulWidget {
 }
 
 class _EdPelState extends State<EditPelangganForm> with Submit<EditPelangganForm> {
-  static const keys = ['nama', 'nik', 'hp', 'rtrw', 'kampung', 'kecamatan', 'kabupaten', 'koordinat', 'ont_sn', 'teknisi', 'tgl_pasang'];
+  static const keys = ['nama', 'nik', 'hp', 'rtrw', 'kampung', 'kecamatan', 'kabupaten', 'koordinat', 'ont_sn', 'teknisi', 'sales', 'tgl_pasang'];
   late final Map<String, TextEditingController> t = {for (final k in keys) k: _c(widget.c.s(k))};
 
   @override
@@ -1135,6 +1138,7 @@ class _EdPelState extends State<EditPelangganForm> with Submit<EditPelangganForm
         tf(t['koordinat']!, 'Titik koordinat', hint: '-7.3274, 108.2207 (atau link Google Maps)'),
         tf(t['ont_sn']!, 'Serial No ONT'),
         tf(t['teknisi']!, 'Nama teknisi'),
+        tf(t['sales']!, 'Nama Sales'),
         tf(t['tgl_pasang']!, 'Tanggal pasang (yyyy-MM-dd)'),
         const Padding(
           padding: EdgeInsets.only(bottom: 12),
@@ -1155,7 +1159,7 @@ class PasangBaruForm extends StatefulWidget {
 
 class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
   final t = {
-    for (final k in ['id', 'nama', 'nik', 'hp', 'rtrw', 'kampung', 'kec', 'kab', 'koor', 'sn', 'teknisi', 'admin'])
+    for (final k in ['id', 'nama', 'nik', 'hp', 'rtrw', 'kampung', 'kec', 'kab', 'koor', 'sn', 'teknisi', 'sales', 'admin'])
       k: _c(),
   }..addAll({'drop': _c('0'), 'patch': _c('0'), 'biaya': _c('0'), 'bulan': _c('1')});
   String? paketId, ontId, foId, stbId;
@@ -1222,6 +1226,8 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       'stb': stb == null ? '' : stokName(stb),
       'stb_id': stb?.s('id') ?? '',
       'teknisi': t['teknisi']!.text.trim(),
+      'sales': t['sales']!.text.trim(),
+      'jam_pasang': DateFormat('HH:mm:ss').format(DateTime.now()),
       'biaya_pasang': biaya,
       'metode_pasang': metode,
       'tgl_pasang': now,
@@ -1293,6 +1299,7 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       if (p != null && p.s('bundling') == 'Ya')
         dd('STB (paket bundling)', stbId, stokItems('STB'), (v) => setState(() => stbId = v)),
       tf(t['teknisi']!, 'Nama teknisi'),
+      tf(t['sales']!, 'Nama Sales'),
       tf(t['biaya']!, 'Biaya pasang baru (Rp)', kb: numKb),
       dd('Metode pembayaran', metode, lst(Cfg.metodePasang), (v) => setState(() => metode = v!)),
       payHint(metode),
@@ -1920,6 +1927,7 @@ class BottomNav extends StatelessWidget {
     (Icons.inventory_2_outlined, Icons.inventory_2, 'Stok'),
     (Icons.router_outlined, Icons.router, 'Paket'),
     (Icons.account_balance_outlined, Icons.account_balance, 'Keuangan'),
+    (Icons.badge_outlined, Icons.badge, 'Sales'),
   ];
 
   @override
@@ -3049,3 +3057,404 @@ Future<Uint8List> buildTagihan(Rec c) async {
   ));
   return doc.save();
 }
+
+
+// ============================================================
+//  MODUL SALES - dikelompokkan langsung dari data Pelanggan
+// ============================================================
+// ---------- SALES (data diambil dari kolom "sales" pada daftar pelanggan) ----------
+DateTime? tglPasang(Rec c) => DateTime.tryParse(c.s('tgl_pasang'));
+
+String tglJam(Rec c) {
+  final d = tglPasang(c);
+  if (d == null) return '-';
+  final base = DateFormat('dd/MM/yyyy').format(d);
+  final j = c.s('jam_pasang');
+  return j.isEmpty ? base : '$base $j';
+}
+
+class SalesInfo {
+  final String nama;
+  final List<Rec> pel;
+  SalesInfo(this.nama, this.pel);
+  int get total => pel.length;
+  int get bulanIni {
+    final n = DateTime.now();
+    return pel.where((c) {
+      final d = tglPasang(c);
+      return d != null && d.year == n.year && d.month == n.month;
+    }).length;
+  }
+}
+
+/// Kelompokkan pelanggan per nama sales (huruf besar/kecil dianggap sama).
+List<SalesInfo> salesList() {
+  final names = <String, String>{};
+  final groups = <String, List<Rec>>{};
+  for (final c in store.pelanggan) {
+    final n = c.s('sales');
+    if (n.isEmpty) continue;
+    final k = n.toLowerCase();
+    names.putIfAbsent(k, () => n);
+    groups.putIfAbsent(k, () => []).add(c);
+  }
+  final l = [for (final e in groups.entries) SalesInfo(names[e.key]!, e.value)];
+  l.sort((a, b) {
+    final d = b.bulanIni - a.bulanIni;
+    if (d != 0) return d;
+    final t = b.total - a.total;
+    return t != 0 ? t : a.nama.compareTo(b.nama);
+  });
+  return l;
+}
+
+SalesInfo? findSales(String nama) {
+  for (final s in salesList()) {
+    if (s.nama.toLowerCase() == nama.toLowerCase()) return s;
+  }
+  return null;
+}
+
+List<String> salesNames() => salesList().map((s) => s.nama).toList();
+
+class SalesTab extends StatefulWidget {
+  const SalesTab({super.key});
+  @override
+  State<SalesTab> createState() => _SalesTabState();
+}
+
+class _SalesTabState extends State<SalesTab> {
+  String q = '';
+
+  Future<void> act(String a, String nama) async {
+    switch (a) {
+      case 'detail':
+        {
+          final r = await sheet(context, SalesDetail(nama));
+          if (r is String && mounted) await act(r, nama);
+          break;
+        }
+      case 'edit':
+        await sheet(context, SalesEditForm(nama));
+        break;
+      case 'hapus':
+        {
+          final s = findSales(nama);
+          if (s == null) return;
+          final yes = await confirm(
+            context,
+            'Hapus sales ${s.nama}?',
+            '${s.total} pelanggan tetap ada di daftar pelanggan. Hanya kolom Nama Sales pada pelanggan tersebut yang dikosongkan.',
+          );
+          if (!yes || !mounted) return;
+          await exec(context, [
+            for (final c in s.pel) op('Pelanggan', 'upsert', {'id': c.s('id'), 'sales': ''}),
+          ], ok: 'Sales dihapus');
+          break;
+        }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final all = salesList();
+    final list = all.where((s) => s.nama.toLowerCase().contains(q.toLowerCase())).toList();
+    final totalBulan = all.fold<int>(0, (a, s) => a + s.bulanIni);
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(7, 4, 7, 0),
+        child: Row(children: [
+          Expanded(child: Metric('Total Sales', '${all.length}', C.cyan, Icons.badge)),
+          Expanded(child: Metric('Pelanggan Baru Bulan Ini', '$totalBulan', C.emerald, Icons.person_add)),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+        child: TextField(
+          onChanged: (v) => setState(() => q = v),
+          decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search), hintText: 'Cari nama sales', border: OutlineInputBorder()),
+        ),
+      ),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: store.refresh,
+          child: list.isEmpty
+              ? ListView(children: const [
+                  SizedBox(height: 120),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32),
+                    child: Center(
+                      child: Text(
+                        'Belum ada data sales.\nIsi "Nama Sales" saat pasang baru atau lewat Edit Data pelanggan.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ])
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final s = list[i];
+                    return Panel(
+                      onTap: () => act('detail', s.nama),
+                      child: Row(children: [
+                        CircleAvatar(
+                          backgroundColor: C.emerald.withValues(alpha: .18),
+                          child: Text(s.nama.characters.first.toUpperCase(), style: const TextStyle(color: C.emerald)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(s.nama, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text('Total pelanggan: ${s.total}', style: const TextStyle(color: C.slate, fontSize: 12)),
+                          ]),
+                        ),
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text('${s.bulanIni}',
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold, color: s.bulanIni > 0 ? C.emerald : C.slate)),
+                          const Text('bulan ini', style: TextStyle(color: C.slate, fontSize: 11)),
+                        ]),
+                        PopupMenuButton<String>(
+                          onSelected: (a) => act(a, s.nama),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'detail', child: Text('Lihat Pelanggan')),
+                            PopupMenuItem(value: 'edit', child: Text('Edit Data Sales')),
+                            PopupMenuItem(value: 'hapus', child: Text('Hapus Sales')),
+                          ],
+                        ),
+                      ]),
+                    );
+                  },
+                ),
+        ),
+      ),
+    ]);
+  }
+}
+
+// ---------- Detail sales: daftar pelanggan + tanggal/waktu ----------
+class SalesDetail extends StatefulWidget {
+  final String nama;
+  const SalesDetail(this.nama, {super.key});
+  @override
+  State<SalesDetail> createState() => _SalesDetailState();
+}
+
+class _SalesDetailState extends State<SalesDetail> {
+  bool onlyMonth = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = findSales(widget.nama);
+    if (s == null) {
+      return const Padding(padding: EdgeInsets.all(24), child: Text('Data sales tidak ditemukan'));
+    }
+    final now = DateTime.now();
+    final list = s.pel.where((c) {
+      if (!onlyMonth) return true;
+      final d = tglPasang(c);
+      return d != null && d.year == now.year && d.month == now.month;
+    }).toList()
+      ..sort((a, b) {
+        final d = (tglPasang(b) ?? DateTime(2000)).compareTo(tglPasang(a) ?? DateTime(2000));
+        return d != 0 ? d : b.s('jam_pasang').compareTo(a.s('jam_pasang'));
+      });
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Sales: ${s.nama}', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: Metric('Pelanggan Bulan Ini', '${s.bulanIni}', C.emerald, Icons.calendar_month)),
+          Expanded(child: Metric('Total Pelanggan', '${s.total}', C.cyan, Icons.people)),
+        ]),
+        Row(children: [
+          ChoiceChip(label: const Text('Semua'), selected: !onlyMonth, onSelected: (_) => setState(() => onlyMonth = false)),
+          const SizedBox(width: 8),
+          ChoiceChip(label: const Text('Bulan ini'), selected: onlyMonth, onSelected: (_) => setState(() => onlyMonth = true)),
+        ]),
+        const SizedBox(height: 8),
+        if (list.isEmpty)
+          const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('Tidak ada pelanggan pada periode ini')))
+        else
+          for (final c in list)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${c.s('nama')} (${c.s('id')})', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(c.s('paket').isEmpty ? '-' : c.s('paket'), style: const TextStyle(color: C.slate, fontSize: 12)),
+                  ]),
+                ),
+                const SizedBox(width: 8),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  const Icon(Icons.event, size: 14, color: C.cyan),
+                  Text(tglJam(c), style: const TextStyle(fontSize: 12)),
+                ]),
+              ]),
+            ),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Sales'),
+              onPressed: () => Navigator.pop(context, 'edit'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: C.rose),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Hapus Sales'),
+              onPressed: () => Navigator.pop(context, 'hapus'),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ---------- Edit data sales: nama sales, deretan pelanggan, dan tanggalnya ----------
+class SalesEditForm extends StatefulWidget {
+  final String nama;
+  const SalesEditForm(this.nama, {super.key});
+  @override
+  State<SalesEditForm> createState() => _SalesEditState();
+}
+
+class _SalesEditState extends State<SalesEditForm> with Submit<SalesEditForm> {
+  late final TextEditingController nameC = _c(widget.nama);
+  late final List<Rec> orig = findSales(widget.nama)?.pel ?? <Rec>[];
+  final Map<String, DateTime> dates = {};
+  final Set<String> removed = {};
+  final List<String> added = [];
+
+  @override
+  void dispose() {
+    nameC.dispose();
+    super.dispose();
+  }
+
+  List<Rec> get current => [
+        ...orig.where((c) => !removed.contains(c.s('id'))),
+        ...added.map((id) => find(store.pelanggan, id)).whereType<Rec>(),
+      ];
+
+  DateTime? dateOf(Rec c) => dates[c.s('id')] ?? tglPasang(c);
+
+  Future<void> pick(Rec c) async {
+    final first = DateTime(2015);
+    final last = DateTime.now().add(const Duration(days: 365));
+    var init = dateOf(c) ?? DateTime.now();
+    if (init.isBefore(first)) init = first;
+    if (init.isAfter(last)) init = last;
+    final d = await showDatePicker(context: context, initialDate: init, firstDate: first, lastDate: last);
+    if (d != null) setState(() => dates[c.s('id')] = d);
+  }
+
+  void save() {
+    final newName = nameC.text.trim();
+    if (newName.isEmpty) {
+      toast(context, 'Nama sales wajib diisi');
+      return;
+    }
+    final ops = <Map<String, dynamic>>[];
+    for (final c in orig) {
+      final id = c.s('id');
+      if (removed.contains(id)) {
+        ops.add(op('Pelanggan', 'upsert', {'id': id, 'sales': ''}));
+        continue;
+      }
+      final d = dates[id];
+      final dateChanged = d != null && ymd(d) != c.s('tgl_pasang');
+      final nameChanged = newName != c.s('sales');
+      if (nameChanged || dateChanged) {
+        ops.add(op('Pelanggan', 'upsert', {
+          'id': id,
+          if (nameChanged) 'sales': newName,
+          if (dateChanged) 'tgl_pasang': ymd(d),
+        }));
+      }
+    }
+    for (final id in added) {
+      final d = dates[id];
+      ops.add(op('Pelanggan', 'upsert', {
+        'id': id,
+        'sales': newName,
+        if (d != null) 'tgl_pasang': ymd(d),
+      }));
+    }
+    if (ops.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    go(ops);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cur = current;
+    final candidates = {
+      for (final p in store.pelanggan)
+        if (p.s('sales').isEmpty && !added.contains(p.s('id'))) p.s('id'): '${p.s('nama')} (${p.s('id')})',
+    };
+    return body('Edit Data Sales', [
+      tf(nameC, 'Nama sales'),
+      Text('Pelanggan (${cur.length})', style: const TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(height: 4),
+      const Text('Ketuk tanggal untuk mengubahnya. Ikon tempat sampah melepas pelanggan dari sales ini.',
+          style: TextStyle(color: C.slate, fontSize: 12)),
+      const SizedBox(height: 8),
+      if (cur.isEmpty)
+        const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Belum ada pelanggan', style: TextStyle(color: C.slate))),
+      for (final c in cur)
+        Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+          decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Expanded(
+              child: Text('${c.s('nama')} (${c.s('id')})', style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.event, size: 16),
+              label: Text(dateOf(c) == null ? '-' : DateFormat('dd/MM/yyyy').format(dateOf(c)!)),
+              onPressed: () => pick(c),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: C.rose),
+              onPressed: () => setState(() {
+                final id = c.s('id');
+                if (added.contains(id)) {
+                  added.remove(id);
+                } else {
+                  removed.add(id);
+                }
+              }),
+            ),
+          ]),
+        ),
+      const SizedBox(height: 8),
+      if (candidates.isNotEmpty)
+        KeyedSubtree(
+          key: ValueKey('add${added.length}'),
+          child: dd('Tambah pelanggan (yang belum punya sales)', '', candidates, (v) {
+            if (v != null && v.isNotEmpty) setState(() => added.add(v));
+          }),
+        ),
+      btn('Simpan Perubahan', save),
+    ]);
+  }
+}
+
+
