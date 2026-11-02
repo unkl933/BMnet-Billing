@@ -247,6 +247,8 @@ class Api {
       post({'action': 'setUserStatus', 'session': AuthSession.token, 'user': {'user_id': id, 'status': status}});
   static Future<Map<String, dynamic>> updateUserRoles(String id, List<String> roles) =>
       post({'action': 'updateUserRoles', 'session': AuthSession.token, 'user': {'user_id': id, 'roles': roles}});
+  static Future<Map<String, dynamic>> claimTicket(String id) =>
+      post({'action': 'claimTicket', 'session': AuthSession.token, 'ticket_id': id});
   static Future<void> logout() async {
     if (AuthSession.token != null) {
       try { await post({'action': 'logout', 'session': AuthSession.token}); } catch (_) {}
@@ -256,7 +258,7 @@ class Api {
 }
 
 class Store extends ChangeNotifier {
-  List<Rec> pelanggan = [], pengeluaran = [], stok = [], paket = [], transaksi = [], material = [], gangguan = [], penarikan = [];
+  List<Rec> pelanggan = [], pengeluaran = [], stok = [], paket = [], transaksi = [], material = [], gangguan = [], penarikan = [], pengajuanMaterial = [];
   bool loading = false;
   String? error;
 
@@ -280,6 +282,7 @@ class Store extends ChangeNotifier {
       material = _l(d, 'Material');
       gangguan = _l(d, 'Gangguan');
       penarikan = _l(d, 'Penarikan');
+      pengajuanMaterial = _l(d, 'PengajuanMaterial');
     } catch (e) {
       error = '$e';
     }
@@ -554,8 +557,8 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int section = 0, tab = 0;
-  static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan', 'Sales'];
-  List<int> get visibleTabs => AuthSession.owner || AuthSession.admin ? [0,1,2,3,4,5,6,7] : AuthSession.sales ? [0,1,7] : AuthSession.teknisi ? [0,1,2] : [0,1,2];
+  static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan', 'Sales', 'Pengajuan Material'];
+  List<int> get visibleTabs => AuthSession.owner || AuthSession.admin ? [0,1,2,3,4,5,6,7,8] : AuthSession.sales ? [0,1,7] : AuthSession.teknisi ? [0,1,2,4,8] : [0,1,2];
 
   @override
   void initState() {
@@ -564,6 +567,8 @@ class _ShellState extends State<Shell> {
   }
 
   Widget? fab(BuildContext c) {
+    if (AuthSession.teknisi && tab == 1) return FloatingActionButton.extended(onPressed: () => openPasangBaru(c), icon: const Icon(Icons.person_add), label: const Text('Pasang Baru'));
+    if (AuthSession.teknisi && tab == 8) return FloatingActionButton.extended(onPressed: () => sheet(c, const PengajuanMaterialForm()), icon: const Icon(Icons.add), label: const Text('Ajukan Material'));
     if (!(AuthSession.owner || AuthSession.admin || AuthSession.sales)) return null;
     switch (tab) {
       case 1:
@@ -671,7 +676,7 @@ class _ShellState extends State<Shell> {
                     ),
                   Expanded(
                     child: IndexedStack(index: tab, children: [
-                      DashTab(onGo: (i) => setState(() => tab = i)),
+                      AuthSession.teknisi ? TeknisiDash(onGo: (i) => setState(() => tab = i)) : DashTab(onGo: (i) => setState(() => tab = i)),
                       // JANGAN pakai const: tab harus ikut rebuild saat store berubah
                       PelangganTab(key: const ValueKey('pel')),
                       GangguanTab(key: const ValueKey('ggn')),
@@ -680,6 +685,7 @@ class _ShellState extends State<Shell> {
                       PaketTab(key: const ValueKey('paket')),
                       KeuTab(key: const ValueKey('keu')),
                       SalesTab(key: const ValueKey('sales')),
+                      PengajuanMaterialTab(key: const ValueKey('pengajuan-material')),
                     ]),
                   ),
                 ]),
@@ -1077,13 +1083,13 @@ class _PelState extends State<PelangganTab> {
             const SizedBox(height: 6),
             Wrap(spacing: 6, runSpacing: 4, children: [
               tag(c.s('paket').isEmpty ? '-' : c.s('paket'), C.cyan),
-              tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
-              if (!lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
+              if (!AuthSession.teknisi) tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
+              if (!AuthSession.teknisi && !lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
               if (c.s('sales').isNotEmpty) tag('Sales: ${c.s('sales')}', C.emerald),
               if (menunggu) tag('Menunggu penarikan', C.amber),
               if (adaGangguan) tag('Gangguan aktif', C.rose),
             ]),
-            if (!lunas && !menunggu)
+            if (!AuthSession.teknisi && !lunas && !menunggu)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: OutlinedButton.icon(
@@ -1097,8 +1103,14 @@ class _PelState extends State<PelangganTab> {
         ),
         PopupMenuButton<String>(
           onSelected: (a) => act(a, c),
-          itemBuilder: (_) => menunggu
+          itemBuilder: (_) => AuthSession.teknisi
               ? const [
+                  PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
+                  PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
+                  PopupMenuItem(value: 'nota', child: Text('Cetak Nota Pemasangan')),
+                ]
+              : menunggu
+                  ? const [
                   PopupMenuItem(value: 'ambil', child: Text('Konfirmasi material diambil')),
                   PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
                   PopupMenuItem(value: 'edit', child: Text('Edit Data')),
@@ -1138,7 +1150,7 @@ class _PelState extends State<PelangganTab> {
               prefixIcon: Icon(Icons.search), hintText: 'Cari nama / ID / kampung', border: OutlineInputBorder()),
         ),
       ),
-      Padding(
+      if (!AuthSession.teknisi) Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(children: [
           for (final x in ['Semua', 'Belum Lunas', 'Lunas'])
@@ -1214,7 +1226,7 @@ class PelangganDetail extends StatelessWidget {
         row('No HP / WA', c.s('hp')),
         const Divider(),
         row('Paket', c.s('paket')),
-        row('Status', bulan == 0 ? 'Lunas' : 'Belum lunas - $bulan bulan (${rpf(bulan * c.n('harga'))})'),
+        if (!AuthSession.teknisi) row('Status', bulan == 0 ? 'Lunas' : 'Belum lunas - $bulan bulan (${rpf(bulan * c.n('harga'))})'),
         row('Tgl pasang', dmy(c.s('tgl_pasang'))),
         row('ONT', c.s('ont')),
         row('SN ONT', c.s('ont_sn')),
@@ -1223,6 +1235,7 @@ class PelangganDetail extends StatelessWidget {
         if (c.s('stb').isNotEmpty) row('STB', c.s('stb')),
         row('Teknisi', c.s('teknisi')),
         row('Nama Sales', c.s('sales')),
+        if (!AuthSession.teknisi) ...[
         const SizedBox(height: 14),
         Row(children: [
           Expanded(
@@ -1242,8 +1255,9 @@ class PelangganDetail extends StatelessWidget {
             ),
           ),
         ]),
+        ],
         const SizedBox(height: 8),
-        SizedBox(
+        if (!AuthSession.teknisi) SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
             icon: const Icon(Icons.payments),
@@ -1251,7 +1265,7 @@ class PelangganDetail extends StatelessWidget {
             onPressed: () => Navigator.pop(context, 'bayar'),
           ),
         ),
-        if (bulan > 0) ...[
+        if (!AuthSession.teknisi && bulan > 0) ...[
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -1352,6 +1366,8 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
     super.dispose();
   }
 
+  bool get teknisiMode => AuthSession.teknisi;
+
   void save() {
     final p = find(store.paket, paketId);
     if (t['nama']!.text.trim().isEmpty || p == null) {
@@ -1366,7 +1382,7 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
     final m = pn(t['drop']!);
     final pc = pn(t['patch']!).toInt();
     final bulan = pn(t['bulan']!).toInt();
-    final biaya = pn(t['biaya']!);
+    final biaya = teknisiMode ? 0 : pn(t['biaya']!);
     final fo = find(store.stok, foId);
     final ont = find(store.stok, ontId);
     final stb = p.s('bundling') == 'Ya' ? find(store.stok, stbId) : null;
@@ -1404,11 +1420,11 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       'patchcore': pc,
       'stb': stb == null ? '' : stokName(stb),
       'stb_id': stb?.s('id') ?? '',
-      'teknisi': t['teknisi']!.text.trim(),
-      'sales': t['sales']!.text.trim(),
+      'teknisi': teknisiMode ? AuthSession.nama : t['teknisi']!.text.trim(),
+      'sales': teknisiMode ? '' : t['sales']!.text.trim(),
       'jam_pasang': DateFormat('HH:mm:ss').format(DateTime.now()),
       'biaya_pasang': biaya,
-      'metode_pasang': metode,
+      'metode_pasang': teknisiMode ? 'Belum Dibayar' : metode,
       'tgl_pasang': now,
       'bulan_tunggak': bulan,
       'tunggakan': bulan * p.n('harga'),
@@ -1434,7 +1450,7 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       'jenis': 'Pasang Baru',
     }));
     num paid = 0;
-    if (metode != 'Belum Dibayar' && biaya > 0) {
+    if (!teknisiMode && metode != 'Belum Dibayar' && biaya > 0) {
       paid = biaya;
       ops.add(op('Transaksi', 'upsert', {
         'id': newId('T'),
@@ -1467,7 +1483,7 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       tf(t['kec']!, 'Kecamatan'),
       tf(t['kab']!, 'Kabupaten'),
       tf(t['koor']!, 'Titik koordinat', hint: '-7.3274, 108.2207'),
-      dd('Paket internet', paketId, {for (final x in store.paket) x.s('id'): '${paketLabel(x)} - ${rpf(x.n('harga'))}'},
+      dd('Paket internet', paketId, {for (final x in store.paket) x.s('id'): '${paketLabel(x)}${AuthSession.teknisi ? '' : ' - ${rpf(x.n('harga'))}'}'},
           (v) => setState(() => paketId = v)),
       tf(t['bulan']!, 'Jumlah bulan tagihan awal', kb: TextInputType.number),
       dd('Perangkat ONT (dari stok)', ontId, stokItems('ONT'), (v) => setState(() => ontId = v)),
@@ -1477,12 +1493,15 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       tf(t['patch']!, 'Pemakaian Patchcore (pcs)', kb: TextInputType.number),
       if (p != null && p.s('bundling') == 'Ya')
         dd('STB (paket bundling)', stbId, stokItems('STB'), (v) => setState(() => stbId = v)),
-      tf(t['teknisi']!, 'Nama teknisi'),
-      tf(t['sales']!, 'Nama Sales'),
-      tf(t['biaya']!, 'Biaya pasang baru (Rp)', kb: numKb),
-      dd('Metode pembayaran', metode, lst(Cfg.metodePasang), (v) => setState(() => metode = v!)),
-      payHint(metode),
-      if (metode != 'Belum Dibayar') tf(t['admin']!, 'Petugas penerima pembayaran'),
+      if (teknisiMode) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('Teknisi pemasang: ${AuthSession.nama}', style: const TextStyle(color: C.cyan))),
+      if (!teknisiMode) ...[
+        tf(t['teknisi']!, 'Nama teknisi'),
+        tf(t['sales']!, 'Nama Sales'),
+        tf(t['biaya']!, 'Biaya pasang baru (Rp)', kb: numKb),
+        dd('Metode pembayaran', metode, lst(Cfg.metodePasang), (v) => setState(() => metode = v!)),
+        payHint(metode),
+        if (metode != 'Belum Dibayar') tf(t['admin']!, 'Petugas penerima pembayaran'),
+      ],
       btn('Simpan & Buat Nota', save),
     ]);
   }
@@ -1866,7 +1885,7 @@ class _SelState extends State<SelesaiForm> with Submit<SelesaiForm> {
       }),
     ];
     // modem pengganti tercatat pada data pelanggan setelah perbaikan selesai
-    if (tipeTiket(t) == 'Pelanggan' && t.s('ont_id').isNotEmpty && find(store.pelanggan, t.s('pelanggan_id')) != null) {
+    if (!AuthSession.teknisi && tipeTiket(t) == 'Pelanggan' && t.s('ont_id').isNotEmpty && find(store.pelanggan, t.s('pelanggan_id')) != null) {
       ops.add(op('Pelanggan', 'upsert', {
         'id': t.s('pelanggan_id'),
         'ont': t.s('ont'),
@@ -1902,6 +1921,12 @@ class _GgTabState extends State<GangguanTab> {
 
   Future<void> act(String a, Rec g) async {
     switch (a) {
+      case 'ambil':
+        final r = await Api.claimTicket(g.s('id'));
+        if (!mounted) return;
+        if (r['ok'] == true) { await store.refresh(); toast(context, 'Tiket berhasil diambil'); }
+        else toast(context, '${r['error'] ?? 'Gagal mengambil tiket'}');
+        break;
       case 'selesai':
         await sheet(context, SelesaiForm(g));
         break;
@@ -1976,8 +2001,10 @@ class _GgTabState extends State<GangguanTab> {
       if (g.n('fo_m') > 0) 'FO: ${fmtN(g.n('fo_m'))} m',
       if (g.n('patch_pcs') > 0) 'Patchcore: ${g.i('patch_pcs')} pcs',
     ];
+    final mine = AuthSession.teknisi && g.s('teknisi').toLowerCase() == AuthSession.nama.toLowerCase();
+    final available = AuthSession.teknisi && g.s('teknisi').trim().isEmpty && open;
     return Panel(
-      onTap: () => act('edit', g),
+      onTap: AuthSession.teknisi ? null : () => act('edit', g),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.only(top: 4), child: dot(open)),
         const SizedBox(width: 12),
@@ -2011,7 +2038,7 @@ class _GgTabState extends State<GangguanTab> {
               Text('Keterangan: $ket', style: const TextStyle(fontSize: 13)),
             ],
             const SizedBox(height: 4),
-            Text('Teknisi: ${g.s('teknisi').isEmpty ? '-' : g.s('teknisi')}', style: const TextStyle(fontSize: 13)),
+            Text('Teknisi: ${g.s('teknisi').isEmpty ? (AuthSession.teknisi ? 'Belum diambil' : '-') : g.s('teknisi')}', style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 6),
             if (mats.isEmpty)
               const Text('Material: -', style: TextStyle(color: C.slate, fontSize: 12))
@@ -2024,7 +2051,8 @@ class _GgTabState extends State<GangguanTab> {
                 'Selesai ${dmy(g.s('tgl_selesai'))}${g.s('catatan_selesai').isEmpty ? '' : ' - ${g.s('catatan_selesai')}'}',
                 style: const TextStyle(color: C.emerald, fontSize: 12),
               ),
-            if (open)
+            if (available) Padding(padding: const EdgeInsets.only(top: 8), child: FilledButton.icon(icon: const Icon(Icons.handyman), label: const Text('Ambil Tiket Ini'), onPressed: () => act('ambil', g))),
+            if (open && (!AuthSession.teknisi || mine))
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: FilledButton.icon(
@@ -2038,7 +2066,11 @@ class _GgTabState extends State<GangguanTab> {
         ),
         PopupMenuButton<String>(
           onSelected: (a) => act(a, g),
-          itemBuilder: (_) => [
+          itemBuilder: (_) => AuthSession.teknisi ? [
+            if (available) const PopupMenuItem(value: 'ambil', child: Text('Ambil tiket')),
+            if (open && mine) const PopupMenuItem(value: 'selesai', child: Text('Berhasil Diperbaiki')),
+            if (isP || g.s('koordinat').isNotEmpty) const PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
+          ] : [
             if (open) const PopupMenuItem(value: 'selesai', child: Text('Berhasil Diperbaiki')),
             const PopupMenuItem(value: 'edit', child: Text('Edit Tiket')),
             if (isP || g.s('koordinat').isNotEmpty) const PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
@@ -2092,7 +2124,81 @@ class _GgTabState extends State<GangguanTab> {
   }
 }
 
-// ---------- Navigasi bawah (7 menu, titik merah di Gangguan bila ada tiket aktif) ----------
+
+class TeknisiDash extends StatelessWidget {
+  final ValueChanged<int> onGo;
+  const TeknisiDash({super.key, required this.onGo});
+  @override Widget build(BuildContext context) {
+    final open = store.gangguan.where((g) => isOpenTicket(g) && g.s('teknisi').trim().isEmpty).length;
+    final mine = store.gangguan.where((g) => g.s('teknisi').toLowerCase() == AuthSession.nama.toLowerCase()).length;
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      Text('Halo, ${AuthSession.nama}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      Row(children: [Expanded(child: Metric('Tiket tersedia / aktif', '$open', C.rose, Icons.report_problem)), Expanded(child: Metric('Pekerjaan saya', '$mine', C.cyan, Icons.handyman))]),
+      const SizedBox(height: 12),
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Menu Teknisi', style: TextStyle(fontWeight: FontWeight.bold)),
+        ListTile(leading: const Icon(Icons.people, color: C.cyan), title: const Text('Lihat seluruh pelanggan'), onTap: () => onGo(1)),
+        ListTile(leading: const Icon(Icons.report_problem, color: C.rose), title: const Text('Lihat & ambil tiket gangguan'), onTap: () => onGo(2)),
+        ListTile(leading: const Icon(Icons.inventory_2, color: C.amber), title: const Text('Lihat stok material'), onTap: () => onGo(4)),
+        ListTile(leading: const Icon(Icons.assignment, color: C.emerald), title: const Text('Pengajuan material'), onTap: () => onGo(8)),
+      ])),
+      const SizedBox(height: 8),
+      const Text('Riwayat pekerjaan saya', style: TextStyle(fontWeight: FontWeight.bold)),
+      for (final m in store.material.reversed.take(8)) Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(m.s('nama'), style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text('${m.s('jenis')} • ${dmy(m.s('tgl'))}', style: const TextStyle(color: C.slate, fontSize: 12)),
+        Text('ONT: ${m.s('ont').isEmpty ? '-' : m.s('ont')} • FO: ${m.s('dropcore')} m • Patchcore: ${m.s('patchcore')} pcs'),
+      ])),
+      if (store.material.isEmpty) const Text('Belum ada pekerjaan tercatat.', style: TextStyle(color: C.slate, fontSize: 12)),
+    ]);
+  }
+}
+
+class PengajuanMaterialTab extends StatelessWidget {
+  const PengajuanMaterialTab({super.key});
+  @override Widget build(BuildContext context) {
+    final rows = [...store.pengajuanMaterial]..sort((a,b)=>b.s('tgl').compareTo(a.s('tgl')));
+    return RefreshIndicator(onRefresh: store.refresh, child: ListView(padding: const EdgeInsets.only(bottom: 90), children: [
+      if (rows.isEmpty) const Padding(padding: EdgeInsets.all(30), child: Center(child: Text('Belum ada pengajuan material'))),
+      for (final r in rows) Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(r.s('nama_material'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text('${r.s('jumlah')} ${r.s('satuan')} • ${r.s('jenis')}'),
+        if (r.s('alasan').isNotEmpty) Text('Alasan: ${r.s('alasan')}'),
+        const SizedBox(height: 5),
+        Wrap(spacing: 6, children: [tag(r.s('status').isEmpty ? 'Menunggu' : r.s('status'), r.s('status')=='Disetujui' ? C.emerald : C.amber), if (r.s('catatan_admin').isNotEmpty) tag(r.s('catatan_admin'), C.slate)]),
+        Text(dmy(r.s('tgl')), style: const TextStyle(color: C.slate, fontSize: 11)),
+        if (AuthSession.owner || AuthSession.admin) Wrap(spacing: 8, children: [
+          OutlinedButton(onPressed: () => exec(context,[op('PengajuanMaterial','upsert',{'id':r.s('id'),'status':'Disetujui'})],ok:'Pengajuan disetujui'), child: const Text('Setujui')),
+          OutlinedButton(onPressed: () => exec(context,[op('PengajuanMaterial','upsert',{'id':r.s('id'),'status':'Ditolak'})],ok:'Pengajuan ditolak'), child: const Text('Tolak')),
+        ]),
+      ])),
+    ]));
+  }
+}
+
+class PengajuanMaterialForm extends StatefulWidget {
+  const PengajuanMaterialForm({super.key});
+  @override State<PengajuanMaterialForm> createState() => _PengajuanMaterialFormState();
+}
+class _PengajuanMaterialFormState extends State<PengajuanMaterialForm> with Submit<PengajuanMaterialForm> {
+  String materialId = '';
+  final jumlah = _c('1'), alasan = _c();
+  @override void dispose(){ jumlah.dispose(); alasan.dispose(); super.dispose(); }
+  void save(){
+    final item=find(store.stok, materialId); final qty=pn(jumlah);
+    if(item==null || qty<=0){toast(context,'Pilih material dan jumlah yang benar');return;}
+    go([op('PengajuanMaterial','upsert',{'id':newId('REQ'),'tgl':ymd(DateTime.now()),'material_id':item.s('id'),'nama_material':stokName(item),'jenis':item.s('jenis'),'jumlah':qty,'satuan':item.s('satuan'),'alasan':alasan.text.trim(),'status':'Menunggu'})]);
+  }
+  @override Widget build(BuildContext context)=>body('Ajukan Material ke Admin',[
+    dd('Pilih material',materialId,{for(final x in store.stok)x.s('id'):'${stokName(x)} • sisa ${fmtN(x.n('jumlah'))} ${x.s('satuan')}'},(v)=>setState(()=>materialId=v??'')),
+    tf(jumlah,'Jumlah yang dibutuhkan',kb:numKb),
+    tf(alasan,'Alasan / pekerjaan',lines:3),
+    btn('Kirim Pengajuan',save),
+  ]);
+}
+
+// ---------- Navigasi bawah (menu sesuai role) ----------
 class BottomNav extends StatelessWidget {
   final int index, alerts;
   final List<int> visibleIndices;
@@ -2108,6 +2214,7 @@ class BottomNav extends StatelessWidget {
     (Icons.router_outlined, Icons.router, 'Paket'),
     (Icons.account_balance_outlined, Icons.account_balance, 'Keuangan'),
     (Icons.badge_outlined, Icons.badge, 'Sales'),
+    (Icons.assignment_outlined, Icons.assignment, 'Material'),
   ];
 
   @override
@@ -2463,7 +2570,7 @@ class StokTab extends StatelessWidget {
           Builder(builder: (context) {
             final low = s.n('jumlah') <= (s.s('satuan') == 'm' ? 100 : 3);
             return Panel(
-              onTap: () => sheet(context, StokForm(e: s)),
+              onTap: AuthSession.teknisi ? null : () => sheet(context, StokForm(e: s)),
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2481,7 +2588,7 @@ class StokTab extends StatelessWidget {
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: low ? C.rose : C.emerald)),
                   Text(s.s('satuan'), style: const TextStyle(color: C.slate, fontSize: 12)),
                 ]),
-                IconButton(
+                if (!AuthSession.teknisi) IconButton(
                   icon: const Icon(Icons.delete_outline, color: C.slate),
                   onPressed: () async {
                     final yes = await confirm(context, 'Hapus item stok?', '${s.s('nama')} akan dihapus dari daftar stok.');
@@ -2589,7 +2696,7 @@ class PaketTab extends StatelessWidget {
                     ]),
                   ]),
                 ),
-                IconButton(
+                if (!AuthSession.teknisi) IconButton(
                   icon: const Icon(Icons.delete_outline, color: C.slate),
                   onPressed: () async {
                     final yes = await confirm(context, 'Hapus paket?', '${paketLabel(p)} akan dihapus dari daftar paket.');
