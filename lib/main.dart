@@ -22,7 +22,6 @@ import 'package:url_launcher/url_launcher.dart';
 // ------------------------------------------------------------
 class Cfg {
   static const scriptUrl = 'https://script.google.com/macros/s/AKfycbwkQ4HbMaBlE4tVxlIUIfhNTgXgkgmzz-kWF-CHmuMMs1BB95okkMvuntsCFwx_F0M/exec';
-  static const token = '331933'; // samakan dengan TOKEN di Code.gs (boleh kosong)
   static const company = 'BM Network';
   static const tagline = 'Internet Solution';
   static const address = 'Jl.Kiarajangkung No 04, Sukahening TSM, Jawa Barat ID ';
@@ -177,11 +176,50 @@ Map<String, dynamic> op(String sheet, String o, Map<String, dynamic> d) =>
     {'sheet': sheet, 'op': o, 'data': dual(d)};
 Map<String, dynamic> adj(String id, num delta) => op('Stok', 'adjust', {'id': id, 'delta': delta});
 
+class AuthSession {
+  static final ValueNotifier<bool> changed = ValueNotifier<bool>(false);
+  static String? token;
+  static Map<String, dynamic>? user;
+  static String? activeRole;
+  static List<String> get roles {
+    final raw = user?['roles'];
+    final values = raw is List ? raw : (user?['role'] == null ? <dynamic>[] : [user!['role']]);
+    final out = <String>[];
+    for (final value in values) {
+      final r = '$value'.trim().toLowerCase();
+      if (r.isNotEmpty && !out.contains(r)) out.add(r);
+    }
+    if (out.isEmpty && user?['role'] != null) out.add('${user!['role']}'.toLowerCase());
+    return out;
+  }
+  static String get role => (activeRole != null && roles.contains(activeRole) ? activeRole! : (roles.isNotEmpty ? roles.first : '')).toLowerCase();
+  static String get nama => '${user?['nama'] ?? ''}';
+  static bool get loggedIn => token != null && user != null;
+  static bool get owner => role == 'owner';
+  static bool get admin => role == 'admin';
+  static bool get sales => role == 'sales';
+  static bool get teknisi => role == 'teknisi';
+  static bool get pkl => role == 'pkl';
+  static bool get canManageUsers => owner || admin;
+  static void setMode(String value) { if (roles.contains(value.toLowerCase())) { activeRole = value.toLowerCase(); changed.value = !changed.value; } }
+  static void clear() { token = null; user = null; activeRole = null; changed.value = false; }
+}
+
 class Api {
+  static Future<Map<String, dynamic>> login(String username, String password) async {
+    final r = await post({'action': 'login', 'username': username, 'password': password});
+    if (r['ok'] == true) {
+      AuthSession.token = '${r['session']}';
+      AuthSession.user = Map<String, dynamic>.from(r['user'] as Map);
+      AuthSession.activeRole = '${AuthSession.user?['active_role'] ?? (AuthSession.roles.isNotEmpty ? AuthSession.roles.first : '')}'.toLowerCase();
+      AuthSession.changed.value = true;
+    }
+    return r;
+  }
+
   static Future<Map<String, dynamic>> get() async {
-    if (Cfg.scriptUrl.startsWith('PASTE')) throw 'Isi Cfg.scriptUrl dengan URL Web App Apps Script';
-    final r = await http
-        .get(Uri.parse('${Cfg.scriptUrl}?action=all&token=${Uri.encodeComponent(Cfg.token)}'))
+    if (!AuthSession.loggedIn) throw 'Silakan login terlebih dahulu.';
+    final r = await http.get(Uri.parse('${Cfg.scriptUrl}?action=all&session=${Uri.encodeComponent(AuthSession.token!)}&active_role=${Uri.encodeComponent(AuthSession.role)}'))
         .timeout(const Duration(seconds: 40));
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -192,15 +230,28 @@ class Api {
       final req = http.Request('POST', Uri.parse(Cfg.scriptUrl))
         ..followRedirects = false
         ..headers['Content-Type'] = 'text/plain;charset=utf-8'
-        ..body = jsonEncode(body);
+        ..body = jsonEncode({...body, if (AuthSession.loggedIn && body['action'] != 'login') 'active_role': AuthSession.role});
       var res = await http.Response.fromStream(await client.send(req).timeout(const Duration(seconds: 40)));
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers['location'] != null) {
         res = await http.get(Uri.parse(res.headers['location']!));
       }
       return jsonDecode(res.body) as Map<String, dynamic>;
-    } finally {
-      client.close();
+    } finally { client.close(); }
+  }
+
+  static Future<Map<String, dynamic>> createUser(Map<String, dynamic> user) =>
+      post({'action': 'createUser', 'session': AuthSession.token, 'user': user});
+  static Future<Map<String, dynamic>> listUsers() =>
+      post({'action': 'listUsers', 'session': AuthSession.token});
+  static Future<Map<String, dynamic>> setUserStatus(String id, String status) =>
+      post({'action': 'setUserStatus', 'session': AuthSession.token, 'user': {'user_id': id, 'status': status}});
+  static Future<Map<String, dynamic>> updateUserRoles(String id, List<String> roles) =>
+      post({'action': 'updateUserRoles', 'session': AuthSession.token, 'user': {'user_id': id, 'roles': roles}});
+  static Future<void> logout() async {
+    if (AuthSession.token != null) {
+      try { await post({'action': 'logout', 'session': AuthSession.token}); } catch (_) {}
     }
+    AuthSession.clear();
   }
 }
 
@@ -239,7 +290,7 @@ class Store extends ChangeNotifier {
   /// Kirim beberapa operasi sekaligus (atomik di server), lalu sinkron ulang.
   Future<String?> run(List<Map<String, dynamic>> ops) async {
     try {
-      final r = await Api.post({'action': 'batch', 'token': Cfg.token, 'ops': ops});
+      final r = await Api.post({'action': 'batch', 'session': AuthSession.token, 'ops': ops});
       if (r['ok'] != true) return '${r['error'] ?? 'Gagal menyimpan'}';
       await refresh();
       return error;
@@ -491,7 +542,7 @@ class BMApp extends StatelessWidget {
           bottomSheetTheme: const BottomSheetThemeData(backgroundColor: C.card),
           navigationBarTheme: const NavigationBarThemeData(backgroundColor: C.card),
         ),
-        home: const Shell(),
+        home: const AuthGate(),
       );
 }
 
@@ -504,6 +555,7 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int section = 0, tab = 0;
   static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan', 'Sales'];
+  List<int> get visibleTabs => AuthSession.owner || AuthSession.admin ? [0,1,2,3,4,5,6,7] : AuthSession.sales ? [0,1,7] : AuthSession.teknisi ? [0,1,2] : [0,1,2];
 
   @override
   void initState() {
@@ -512,6 +564,7 @@ class _ShellState extends State<Shell> {
   }
 
   Widget? fab(BuildContext c) {
+    if (!(AuthSession.owner || AuthSession.admin || AuthSession.sales)) return null;
     switch (tab) {
       case 1:
         return FloatingActionButton.extended(
@@ -538,6 +591,7 @@ class _ShellState extends State<Shell> {
       listenable: store,
       builder: (context, _) {
         final billing = section == 0;
+        if (!visibleTabs.contains(tab)) tab = visibleTabs.first;
         return Scaffold(
           appBar: AppBar(
             title: Text(billing ? 'Billing - ${titles[tab]}' : 'Tentang Aplikasi'),
@@ -548,6 +602,20 @@ class _ShellState extends State<Shell> {
                             padding: EdgeInsets.all(16),
                             child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)))
                         : IconButton(tooltip: 'Refresh data', icon: const Icon(Icons.refresh), onPressed: store.refresh),
+                    if (AuthSession.canManageUsers) IconButton(tooltip: 'Manajemen akun', icon: const Icon(Icons.manage_accounts), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserManagementPage()))),
+                    PopupMenuButton<String>(
+                      onSelected: (v) async {
+                        if (v == 'logout') { await Api.logout(); if (mounted) setState(() { tab = 0; }); }
+                        else if (v.startsWith('mode:')) { AuthSession.setMode(v.substring(5)); if (mounted) setState(() { tab = 0; }); await store.refresh(); }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(value: 'profile', enabled: false, child: Text('${AuthSession.nama} • ${AuthSession.roles.join(' + ')}')),
+                        if (AuthSession.roles.length > 1) const PopupMenuDivider(),
+                        if (AuthSession.roles.length > 1) const PopupMenuItem(value: 'mode_label', enabled: false, child: Text('Ganti mode kerja')),
+                        if (AuthSession.roles.length > 1) ...AuthSession.roles.map((r) => PopupMenuItem(value: 'mode:$r', child: Row(children: [Icon(AuthSession.role == r ? Icons.radio_button_checked : Icons.radio_button_off, size: 18), const SizedBox(width: 8), Text(r.toUpperCase())]))),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(value: 'logout', child: Text('Logout')),
+                      ]),
                   ]
                 : null,
           ),
@@ -561,6 +629,7 @@ class _ShellState extends State<Shell> {
                     const SizedBox(height: 10),
                     const Text('BM Network', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const Text('Internet Solution', style: TextStyle(color: C.slate)),
+                    Text('${AuthSession.nama} • ${AuthSession.roles.join(' + ')} (mode ${AuthSession.role.toUpperCase()})', style: const TextStyle(color: C.emerald, fontSize: 12)),
                   ]),
                 ),
                 const Divider(),
@@ -576,6 +645,7 @@ class _ShellState extends State<Shell> {
                 const ListTile(enabled: false, leading: Icon(Icons.hub), title: Text('PPPoE'), subtitle: Text('Segera hadir')),
                 const ListTile(
                     enabled: false, leading: Icon(Icons.confirmation_number), title: Text('Voucher'), subtitle: Text('Segera hadir')),
+                if (AuthSession.canManageUsers) ListTile(leading: const Icon(Icons.manage_accounts), title: const Text('Manajemen Akun'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const UserManagementPage())); }),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
@@ -617,6 +687,7 @@ class _ShellState extends State<Shell> {
           bottomNavigationBar: billing
               ? BottomNav(
                   index: tab,
+                  visibleIndices: visibleTabs,
                   alerts: store.gangguan.where(isOpenTicket).length,
                   onTap: (i) => setState(() => tab = i),
                 )
@@ -625,6 +696,114 @@ class _ShellState extends State<Shell> {
       },
     );
   }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+  @override State<AuthGate> createState() => _AuthGateState();
+}
+class _AuthGateState extends State<AuthGate> {
+  @override Widget build(BuildContext context) => ValueListenableBuilder<bool>(valueListenable: AuthSession.changed, builder: (context, loggedIn, _) => loggedIn && AuthSession.loggedIn
+      ? Shell(key: ValueKey(AuthSession.user?['user_id']))
+      : LoginPage(onLogin: () => setState(() {})));
+}
+
+class LoginPage extends StatefulWidget {
+  final VoidCallback onLogin;
+  const LoginPage({super.key, required this.onLogin});
+  @override State<LoginPage> createState() => _LoginPageState();
+}
+class _LoginPageState extends State<LoginPage> {
+  final username = TextEditingController(), password = TextEditingController();
+  bool busy = false, obscure = true;
+  Future<void> submit() async {
+    if (username.text.trim().isEmpty || password.text.isEmpty) { toast(context, 'Username dan password wajib diisi'); return; }
+    setState(() => busy = true);
+    try {
+      final r = await Api.login(username.text.trim(), password.text);
+      if (r['ok'] == true) { widget.onLogin(); }
+      else if (mounted) toast(context, '${r['error'] ?? 'Login gagal'}');
+    } catch (e) { if (mounted) toast(context, 'Gagal login: $e'); }
+    if (mounted) setState(() => busy = false);
+  }
+  @override void dispose() { username.dispose(); password.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Scaffold(
+    body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Image.asset('assets/images/logo.png', height: 92), const SizedBox(height: 18),
+        const Text('BM Network', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+        const Text('Login ke akun operasional', style: TextStyle(color: C.slate)), const SizedBox(height: 28),
+        TextField(controller: username, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+        const SizedBox(height: 12), TextField(controller: password, obscureText: obscure, onSubmitted: (_) => submit(), decoration: InputDecoration(labelText: 'Password', prefixIcon: const Icon(Icons.lock), border: const OutlineInputBorder(), suffixIcon: IconButton(icon: Icon(obscure ? Icons.visibility : Icons.visibility_off), onPressed: () => setState(() => obscure = !obscure)))),
+        const SizedBox(height: 18), SizedBox(width: double.infinity, child: FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator() : const Text('LOGIN'))),
+      ])))));
+}
+
+class UserManagementPage extends StatefulWidget {
+  const UserManagementPage({super.key});
+  @override State<UserManagementPage> createState() => _UserManagementPageState();
+}
+class _UserManagementPageState extends State<UserManagementPage> {
+  List users = []; bool loading = true;
+  static const allRoles = ['Owner','Admin','Sales','Teknisi','PKL'];
+  Future<void> load() async {
+    setState(() => loading = true);
+    try { final r = await Api.listUsers(); if (r['ok'] == true) users = r['users'] as List; else if (mounted) toast(context, '${r['error']}'); }
+    catch(e) { if(mounted) toast(context, '$e'); }
+    if(mounted) setState(() => loading = false);
+  }
+  @override void initState() { super.initState(); load(); }
+  Future<List<String>?> chooseRoles({List<String> initial = const ['Sales']}) async {
+    final picked = initial.map((e) => e.toLowerCase()).toSet();
+    return showDialog<List<String>>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx,setD) => AlertDialog(
+      title: const Text('Pilih Multi Role'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [for (final role in allRoles.where((r) => AuthSession.owner || r != 'Owner')) CheckboxListTile(
+        dense: true, contentPadding: EdgeInsets.zero, title: Text(role), value: picked.contains(role.toLowerCase()),
+        onChanged: (v) => setD(() { if (v == true) picked.add(role.toLowerCase()); else picked.remove(role.toLowerCase()); }),
+      )]),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')), FilledButton(onPressed: picked.isEmpty ? null : () => Navigator.pop(ctx, allRoles.where((r) => picked.contains(r.toLowerCase())).toList()), child: const Text('Simpan Role'))],
+    )));
+  }
+  Future<void> add() async {
+    final n=TextEditingController(),u=TextEditingController(),p=TextEditingController();
+    final roles = await chooseRoles();
+    if (roles == null) { n.dispose();u.dispose();p.dispose(); return; }
+    final result=await showDialog<Map<String,dynamic>>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Buat akun pengguna'),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[tf(n,'Nama lengkap'),tf(u,'Username'),tf(p,'Password (minimal 8 karakter)'),const SizedBox(height:8),Text('Role: ${roles.join(' + ')}')])),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Batal')),FilledButton(onPressed:()=>Navigator.pop(ctx,{'nama':n.text.trim(),'username':u.text.trim(),'password':p.text,'roles':roles}),child:const Text('Buat akun'))]));
+    n.dispose();u.dispose();p.dispose(); if(result==null)return;
+    final r=await Api.createUser(result); if(!mounted)return; toast(context,r['ok']==true?'Akun berhasil dibuat':'${r['error']??'Gagal membuat akun'}'); if(r['ok']==true)load();
+  }
+  Future<void> editRoles(Map u) async {
+    final raw = u['roles'];
+    final initial = raw is List ? raw.map((e)=>'$e').toList() : ['${u['role'] ?? 'Sales'}'];
+    final roles = await chooseRoles(initial: initial);
+    if (roles == null) return;
+    final r = await Api.updateUserRoles('${u['user_id']}', roles);
+    if (!mounted) return;
+    toast(context, r['ok']==true ? 'Role pengguna diperbarui' : '${r['error'] ?? 'Gagal memperbarui role'}');
+    if (r['ok']==true) load();
+  }
+  Future<void> toggle(Map u) async {
+    final next='${u['status']}'=='Aktif'?'Nonaktif':'Aktif';
+    final r=await Api.setUserStatus('${u['user_id']}',next);
+    if(!mounted)return;toast(context,r['ok']==true?'Status akun diubah':'${r['error']}');if(r['ok']==true)load();
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Manajemen Akun')),
+    floatingActionButton:FloatingActionButton.extended(onPressed:add,icon:const Icon(Icons.person_add),label:const Text('Buat Akun')),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.only(bottom:90),children:[
+      for(final x in users) Card(margin:const EdgeInsets.symmetric(horizontal:12,vertical:5),child:ListTile(
+        leading:CircleAvatar(child:Text('${x['nama']??'?'}'.isNotEmpty?'${x['nama']}'.substring(0,1).toUpperCase():'?')),
+        title:Text('${x['nama']}'),
+        subtitle:Text('@${x['username']} • ${((x['roles'] is List) ? (x['roles'] as List).join(' + ') : x['role'])} • ${x['status']}'),
+        trailing:Wrap(spacing:0, children:[
+          IconButton(tooltip:'Atur role',icon:const Icon(Icons.tune),onPressed:()=>editRoles(Map<String,dynamic>.from(x))),
+          if (AuthSession.owner || '${x['role']}'.toLowerCase()!='owner') IconButton(tooltip:'Aktif/nonaktif',icon:Icon('${x['status']}'=='Aktif'?Icons.block:Icons.check_circle_outline),onPressed:()=>toggle(Map<String,dynamic>.from(x))),
+        ]),
+      ))
+    ])));
 }
 
 class AboutPage extends StatelessWidget {
@@ -1916,8 +2095,9 @@ class _GgTabState extends State<GangguanTab> {
 // ---------- Navigasi bawah (7 menu, titik merah di Gangguan bila ada tiket aktif) ----------
 class BottomNav extends StatelessWidget {
   final int index, alerts;
+  final List<int> visibleIndices;
   final ValueChanged<int> onTap;
-  const BottomNav({super.key, required this.index, required this.alerts, required this.onTap});
+  const BottomNav({super.key, required this.index, required this.alerts, required this.visibleIndices, required this.onTap});
 
   static const items = [
     (Icons.dashboard_outlined, Icons.dashboard, 'Beranda'),
@@ -1938,7 +2118,7 @@ class BottomNav extends StatelessWidget {
           child: SizedBox(
             height: 62,
             child: Row(children: [
-              for (var i = 0; i < items.length; i++)
+              for (final i in visibleIndices)
                 Expanded(
                   child: InkWell(
                     onTap: () => onTap(i),
