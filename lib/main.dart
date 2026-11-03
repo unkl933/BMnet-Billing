@@ -95,6 +95,9 @@ Rec? find(List<Rec> l, String? id) {
 String statusTiket(Rec g) => g.s('status').isEmpty ? 'Sudah Diperbaiki' : g.s('status');
 bool isOpenTicket(Rec g) => statusTiket(g) == 'Belum Diperbaiki';
 String tipeTiket(Rec g) => g.s('tipe').isEmpty ? 'Pelanggan' : g.s('tipe');
+List<String> teknisiTiket(Rec g) => g.s('teknisi').split(RegExp(r'[|,;\n]+')).map((x) => x.trim()).where((x) => x.isNotEmpty).toList();
+int kuotaTeknisi(Rec g) => g.i('jumlah_teknisi') < 1 ? 1 : g.i('jumlah_teknisi').clamp(1, 10).toInt();
+bool tiketDiambilOleh(Rec g, String nama) => teknisiTiket(g).any((x) => x.toLowerCase() == nama.toLowerCase());
 
 /// Pemakaian stok sebuah tiket: {id stok: jumlah}
 Map<String, num> matMap(String ont, String fo, num m, String patch, num pc) => {
@@ -1659,6 +1662,7 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
   late final String tipe = widget.edit != null ? tipeTiket(widget.edit!) : widget.tipe;
   final jalur = _c(), ket = _c(), teknisi = _c(), sn = _c(), fom = _c('0'), pcs = _c('0');
   String jenis = 'Redaman', custId = '', ontId = '', foId = '', patchId = '';
+  int jumlahTeknisi = 1;
 
   Rec? get cust => find(store.pelanggan, custId);
 
@@ -1671,7 +1675,8 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
       if (e.s('jenis').isNotEmpty) jenis = e.s('jenis');
       jalur.text = e.s('jalur');
       ket.text = e.s('keterangan').isNotEmpty ? e.s('keterangan') : e.s('catatan');
-      teknisi.text = e.s('teknisi');
+      teknisi.text = '';
+      jumlahTeknisi = kuotaTeknisi(e);
       sn.text = e.s('sn_ont');
       ontId = e.s('ont_id');
       foId = e.s('fo_id');
@@ -1704,10 +1709,6 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
     }
     if (!isP && jalur.text.trim().isEmpty) {
       toast(context, 'Isi jalur yang mengalami gangguan');
-      return;
-    }
-    if (teknisi.text.trim().isEmpty) {
-      toast(context, 'Isi nama teknisi yang ditugaskan');
       return;
     }
     final m = pn(fom);
@@ -1761,7 +1762,8 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
       'hp': isP ? (c?.s('hp') ?? e?.s('hp') ?? '') : '',
       'jalur': isP ? '' : jalur.text.trim(),
       'sn_ont': sn.text.trim(),
-      'teknisi': teknisi.text.trim(),
+      'teknisi': e == null ? '' : e.s('teknisi'),
+      'jumlah_teknisi': jumlahTeknisi,
       'ont_id': ontId,
       'ont': ont == null ? '' : stokName(ont),
       'fo_id': foId,
@@ -1784,7 +1786,7 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
         'dropcore': m,
         'patchcore': pc,
         'stb': '',
-        'teknisi': teknisi.text.trim(),
+        'teknisi': e == null ? '' : e.s('teknisi'),
         'jenis': 'Perbaikan',
       }));
     } else if (e != null) {
@@ -1835,7 +1837,13 @@ class _TiketState extends State<TiketForm> with Submit<TiketForm> {
         else
           tf(jalur, 'Jalur yang mengalami gangguan', hint: 'contoh: Jalur ODP-03 Kp. Sirnamanah'),
         tf(ket, 'Keterangan gangguan', lines: 3),
-        tf(teknisi, 'Teknisi yang ditugaskan'),
+        DropdownButtonFormField<int>(
+          value: jumlahTeknisi,
+          decoration: const InputDecoration(labelText: 'Jumlah teknisi yang dibutuhkan'),
+          items: [for (var n = 1; n <= 10; n++) DropdownMenuItem(value: n, child: Text('$n orang'))],
+          onChanged: (v) => setState(() => jumlahTeknisi = v ?? 1),
+        ),
+        const SizedBox(height: 10),
         if (isP) tf(sn, 'Serial Number (SN) ONT'),
         const Divider(),
         const Padding(
@@ -1915,6 +1923,14 @@ class GangguanTab extends StatefulWidget {
 
 class _GgTabState extends State<GangguanTab> {
   String tipeF = 'Semua', statF = 'Semua';
+
+  Future<void> shareTicketWhatsApp(Rec g) async {
+    final place = tipeTiket(g) == 'Pelanggan' ? '${g.s('nama')} • ${g.s('alamat')}' : 'Jalur ${g.s('jalur')}';
+    final msg = ['🚨 TIKET GANGGUAN BM NETWORK','No: ${g.s('no_tiket')}','Lokasi: $place','Jenis: ${g.s('jenis')}','Keterangan: ${g.s('keterangan').isEmpty ? g.s('catatan') : g.s('keterangan')}','Teknisi: ${teknisiTiket(g).isEmpty ? 'Belum ada' : teknisiTiket(g).join(', ')}','Kebutuhan: ${teknisiTiket(g).length}/${kuotaTeknisi(g)} orang',if (g.s('koordinat').isNotEmpty) 'Koordinat: ${g.s('koordinat')}'].join('\n');
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) toast(context, 'Tidak bisa membuka WhatsApp');
+  }
 
   Future<void> act(String a, Rec g) async {
     switch (a) {
@@ -1998,8 +2014,10 @@ class _GgTabState extends State<GangguanTab> {
       if (g.n('fo_m') > 0) 'FO: ${fmtN(g.n('fo_m'))} m',
       if (g.n('patch_pcs') > 0) 'Patchcore: ${g.i('patch_pcs')} pcs',
     ];
-    final mine = AuthSession.teknisi && g.s('teknisi').toLowerCase() == AuthSession.nama.toLowerCase();
-    final available = AuthSession.teknisi && g.s('teknisi').trim().isEmpty && open;
+    final mine = AuthSession.teknisi && tiketDiambilOleh(g, AuthSession.nama);
+    final names = teknisiTiket(g);
+    final capacity = kuotaTeknisi(g);
+    final available = AuthSession.teknisi && open && !mine && names.length < capacity;
     return Panel(
       onTap: AuthSession.teknisi ? null : () => act('edit', g),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2035,8 +2053,10 @@ class _GgTabState extends State<GangguanTab> {
               Text('Keterangan: $ket', style: const TextStyle(fontSize: 13)),
             ],
             const SizedBox(height: 4),
-            Text('Teknisi: ${g.s('teknisi').isEmpty ? (AuthSession.teknisi ? 'Belum diambil' : '-') : g.s('teknisi')}', style: const TextStyle(fontSize: 13)),
+            Text('Teknisi mengambil: ${names.isEmpty ? 'Belum ada' : names.join(', ')}', style: const TextStyle(fontSize: 13)),
+            Text('Kebutuhan teknisi: ${names.length}/$capacity orang', style: const TextStyle(fontSize: 12, color: C.slate)),
             const SizedBox(height: 6),
+            OutlinedButton.icon(onPressed: () => shareTicketWhatsApp(g), icon: const Icon(Icons.share, size: 17), label: const Text('Kirim tiket ke Grup WhatsApp')),
             if (mats.isEmpty)
               const Text('Material: -', style: TextStyle(color: C.slate, fontSize: 12))
             else
@@ -2126,8 +2146,8 @@ class TeknisiDash extends StatelessWidget {
   final ValueChanged<int> onGo;
   const TeknisiDash({super.key, required this.onGo});
   @override Widget build(BuildContext context) {
-    final open = store.gangguan.where((g) => isOpenTicket(g) && g.s('teknisi').trim().isEmpty).length;
-    final mine = store.gangguan.where((g) => g.s('teknisi').toLowerCase() == AuthSession.nama.toLowerCase()).length;
+    final open = store.gangguan.where((g) => isOpenTicket(g) && teknisiTiket(g).length < kuotaTeknisi(g)).length;
+    final mine = store.gangguan.where((g) => tiketDiambilOleh(g, AuthSession.nama)).length;
     return ListView(padding: const EdgeInsets.all(12), children: [
       Text('Halo, ${AuthSession.nama}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       const SizedBox(height: 12),
