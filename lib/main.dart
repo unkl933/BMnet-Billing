@@ -192,16 +192,17 @@ class AuthSession {
     if (out.isEmpty && user?['role'] != null) out.add('${user!['role']}'.toLowerCase());
     return out;
   }
-  static String get role => (activeRole != null && roles.contains(activeRole) ? activeRole! : (roles.isNotEmpty ? roles.first : '')).toLowerCase();
+  static String get role => roles.contains('owner') ? 'owner' : roles.contains('admin') ? 'admin' : (roles.length > 1 ? 'combined' : (roles.isNotEmpty ? roles.first : '')).toLowerCase();
   static String get nama => '${user?['nama'] ?? ''}';
   static bool get loggedIn => token != null && user != null;
-  static bool get owner => role == 'owner';
-  static bool get admin => role == 'admin';
-  static bool get sales => role == 'sales';
-  static bool get teknisi => role == 'teknisi';
-  static bool get pkl => role == 'pkl';
+  static bool get owner => roles.contains('owner');
+  static bool get admin => roles.contains('admin');
+  static bool get sales => roles.contains('sales');
+  static bool get teknisi => roles.contains('teknisi');
+  static bool get teknisiOnly => teknisi && !sales && !owner && !admin;
+  static bool get pkl => roles.contains('pkl');
   static bool get canManageUsers => owner || admin;
-  static void setMode(String value) { if (roles.contains(value.toLowerCase())) { activeRole = value.toLowerCase(); changed.value = !changed.value; } }
+  static void setMode(String value) { activeRole = role; changed.value = !changed.value; }
   static void clear() { token = null; user = null; activeRole = null; changed.value = false; }
 }
 
@@ -558,7 +559,7 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int section = 0, tab = 0;
   static const titles = ['Dashboard', 'Pelanggan', 'Gangguan', 'Pengeluaran', 'Stok Gudang', 'Paket Internet', 'Keuangan', 'Sales', 'Pengajuan Material'];
-  List<int> get visibleTabs => AuthSession.owner || AuthSession.admin ? [0,1,2,3,4,5,6,7,8] : AuthSession.sales ? [0,1,7] : AuthSession.teknisi ? [0,1,2,4,8] : [0,1,2];
+  List<int> get visibleTabs => AuthSession.owner || AuthSession.admin ? [0,1,2,3,4,5,6,7,8] : [0,1,2, if (AuthSession.teknisi) 4, if (AuthSession.sales) 7, if (AuthSession.teknisi) 8];
 
   @override
   void initState() {
@@ -611,13 +612,9 @@ class _ShellState extends State<Shell> {
                     PopupMenuButton<String>(
                       onSelected: (v) async {
                         if (v == 'logout') { await Api.logout(); if (mounted) setState(() { tab = 0; }); }
-                        else if (v.startsWith('mode:')) { AuthSession.setMode(v.substring(5)); if (mounted) setState(() { tab = 0; }); await store.refresh(); }
                       },
                       itemBuilder: (_) => [
                         PopupMenuItem(value: 'profile', enabled: false, child: Text('${AuthSession.nama} • ${AuthSession.roles.join(' + ')}')),
-                        if (AuthSession.roles.length > 1) const PopupMenuDivider(),
-                        if (AuthSession.roles.length > 1) const PopupMenuItem(value: 'mode_label', enabled: false, child: Text('Ganti mode kerja')),
-                        if (AuthSession.roles.length > 1) ...AuthSession.roles.map((r) => PopupMenuItem(value: 'mode:$r', child: Row(children: [Icon(AuthSession.role == r ? Icons.radio_button_checked : Icons.radio_button_off, size: 18), const SizedBox(width: 8), Text(r.toUpperCase())]))),
                         const PopupMenuDivider(),
                         const PopupMenuItem(value: 'logout', child: Text('Logout')),
                       ]),
@@ -634,7 +631,7 @@ class _ShellState extends State<Shell> {
                     const SizedBox(height: 10),
                     const Text('BM Network', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const Text('Internet Solution', style: TextStyle(color: C.slate)),
-                    Text('${AuthSession.nama} • ${AuthSession.roles.join(' + ')} (mode ${AuthSession.role.toUpperCase()})', style: const TextStyle(color: C.emerald, fontSize: 12)),
+                    Text('${AuthSession.nama} • ${AuthSession.roles.join(' + ')}', style: const TextStyle(color: C.emerald, fontSize: 12)),
                   ]),
                 ),
                 const Divider(),
@@ -1083,8 +1080,8 @@ class _PelState extends State<PelangganTab> {
             const SizedBox(height: 6),
             Wrap(spacing: 6, runSpacing: 4, children: [
               tag(c.s('paket').isEmpty ? '-' : c.s('paket'), C.cyan),
-              if (!AuthSession.teknisi) tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
-              if (!AuthSession.teknisi && !lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
+              if (!AuthSession.teknisiOnly) tag(lunas ? 'Lunas' : 'Belum Lunas', lunas ? C.emerald : C.rose),
+              if (!AuthSession.teknisiOnly && !lunas) tag('Tunggakan ${rpf(bulan * c.n('harga'))}', C.rose),
               if (c.s('sales').isNotEmpty) tag('Sales: ${c.s('sales')}', C.emerald),
               if (menunggu) tag('Menunggu penarikan', C.amber),
               if (adaGangguan) tag('Gangguan aktif', C.rose),
@@ -1103,7 +1100,7 @@ class _PelState extends State<PelangganTab> {
         ),
         PopupMenuButton<String>(
           onSelected: (a) => act(a, c),
-          itemBuilder: (_) => AuthSession.teknisi
+          itemBuilder: (_) => AuthSession.teknisiOnly
               ? const [
                   PopupMenuItem(value: 'detail', child: Text('Info Pelanggan')),
                   PopupMenuItem(value: 'maps', child: Text('Buka di Google Maps')),
@@ -1150,7 +1147,7 @@ class _PelState extends State<PelangganTab> {
               prefixIcon: Icon(Icons.search), hintText: 'Cari nama / ID / kampung', border: OutlineInputBorder()),
         ),
       ),
-      if (!AuthSession.teknisi) Padding(
+      if (!AuthSession.teknisiOnly) Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(children: [
           for (final x in ['Semua', 'Belum Lunas', 'Lunas'])
@@ -1226,7 +1223,7 @@ class PelangganDetail extends StatelessWidget {
         row('No HP / WA', c.s('hp')),
         const Divider(),
         row('Paket', c.s('paket')),
-        if (!AuthSession.teknisi) row('Status', bulan == 0 ? 'Lunas' : 'Belum lunas - $bulan bulan (${rpf(bulan * c.n('harga'))})'),
+        if (!AuthSession.teknisiOnly) row('Status', bulan == 0 ? 'Lunas' : 'Belum lunas - $bulan bulan (${rpf(bulan * c.n('harga'))})'),
         row('Tgl pasang', dmy(c.s('tgl_pasang'))),
         row('ONT', c.s('ont')),
         row('SN ONT', c.s('ont_sn')),
@@ -1235,7 +1232,7 @@ class PelangganDetail extends StatelessWidget {
         if (c.s('stb').isNotEmpty) row('STB', c.s('stb')),
         row('Teknisi', c.s('teknisi')),
         row('Nama Sales', c.s('sales')),
-        if (!AuthSession.teknisi) ...[
+        if (!AuthSession.teknisiOnly) ...[
         const SizedBox(height: 14),
         Row(children: [
           Expanded(
@@ -1257,7 +1254,7 @@ class PelangganDetail extends StatelessWidget {
         ]),
         ],
         const SizedBox(height: 8),
-        if (!AuthSession.teknisi) SizedBox(
+        if (!AuthSession.teknisiOnly) SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
             icon: const Icon(Icons.payments),
@@ -1265,7 +1262,7 @@ class PelangganDetail extends StatelessWidget {
             onPressed: () => Navigator.pop(context, 'bayar'),
           ),
         ),
-        if (!AuthSession.teknisi && bulan > 0) ...[
+        if (!AuthSession.teknisiOnly && bulan > 0) ...[
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -1483,7 +1480,7 @@ class _PBState extends State<PasangBaruForm> with Submit<PasangBaruForm> {
       tf(t['kec']!, 'Kecamatan'),
       tf(t['kab']!, 'Kabupaten'),
       tf(t['koor']!, 'Titik koordinat', hint: '-7.3274, 108.2207'),
-      dd('Paket internet', paketId, {for (final x in store.paket) x.s('id'): '${paketLabel(x)}${AuthSession.teknisi ? '' : ' - ${rpf(x.n('harga'))}'}'},
+      dd('Paket internet', paketId, {for (final x in store.paket) x.s('id'): '${paketLabel(x)}${AuthSession.teknisiOnly ? '' : ' - ${rpf(x.n('harga'))}'}'},
           (v) => setState(() => paketId = v)),
       tf(t['bulan']!, 'Jumlah bulan tagihan awal', kb: TextInputType.number),
       dd('Perangkat ONT (dari stok)', ontId, stokItems('ONT'), (v) => setState(() => ontId = v)),
